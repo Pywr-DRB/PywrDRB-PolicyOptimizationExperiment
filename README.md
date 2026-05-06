@@ -123,30 +123,7 @@ ls figures
 - **Stage 2 (simulation + validation):** runs/caches simulations and produces validation figures.
 - **Figures 14–23 (full-Pareto diagnostics):** generated **after** the MPI sweep via `methods/figures_stage3/plot_stage3_full_pareto_figures.py` (not `04_make_figures.py`).
 
-Start by cloning the following repositories:
-
-```bash
-git clone https://github.com/Pywr-DRB/CEE6400Project.git
-git clone https://github.com/philip928lin/BorgTraining.git
-```
-
-These instructions assume you have the following folder structure. You may have a different folder structure, in which case update paths as needed.
-
-```text
-/
-./CEE6400Project/
-./BorgTraining/
-```
-
-We will work in `CEE6400Project/`:
-
-```bash
-cd ./CEE6400Project/
-```
-
-## Setup virtual environment
-
-The `CEE6400Project/requirements.txt` contains all requirements.
+### Environment prerequisites
 
 **Python version:** use **3.10+** (3.11 recommended). The login-node default `python` on some clusters is older; if you see `future feature annotations is not defined` or similar syntax errors, load a modern module and use your venv before running `04_make_figures.py` or `python -m methods.ensemble.postprocess_sim`.
 
@@ -159,7 +136,7 @@ source venv/bin/activate
 pip install -r requirements.txt
 ```
 
-## Setup MMBorgMOEA
+### Borg/MOEA runtime prerequisites
 
 Rather than compiling MMBorgMOEA from scratch, these instructions copy precompiled `libborg*.so` files from the `BorgTraining` (private) repo. If you encounter errors, you may need to clone `MMBorgMOEA` and recompile, following the WaterProgramming guide.
 
@@ -277,7 +254,6 @@ Borg result CSVs are resolved by **`methods/borg_paths.py`** using:
 - `CEE_BORG_MRF_FILTERED` — `1` for MRF-filtered objectives, `0` for full-series (deprecated alias: `CEE_BORG_MRFMASKED`).
 - `CEE_MRF_FILTER_TAG` or `CEE_MRF_FILTER_SOURCE` — user-facing names such as **`regression_disagg`** or **`perfect`** map to on-disk `*_mrffiltered_regression.csv` / `*_mrffiltered_perfect.csv` (see `methods/borg_paths.py`; deprecated: `CEE_MRF_MASK_*`).
 - `CEE_FIG_SUBDIR` — subfolder under `figures/` (e.g. `borg_mrffiltered_regression`) so runs do not overwrite each other.
-- `CEE_PYWR_WORK_DIR` — Pywr-DRB **model** artifacts only (temporary JSON + `output_Parametric_*`, `output_default.hdf5`); default `pywr_data/pywr_tmp_runs` (not under `figures/`).
 - `CEE_PYWR_WORK_DIR` — Pywr JSON + parametric HDF5 for stage 1 (Figs 4–6) and stage 2 (7–11); shared cache naming (default `pywr_data/pywr_tmp_runs`). Legacy `CEE_PYWR_PICK_HDF5_DIR` is unused for parametric runs after the unified cache change.
 
 **`run_postprocessing_and_figures.sh` bundle choice** — optional; default runs all three Borg result sets. Set **`CEE_POSTPROCESS_BUNDLE`** to limit work (overrides `DEBUG_FAST`’s RUN flags when set).
@@ -350,7 +326,6 @@ That batch script also runs the steps above; figures include:
 
 Wide CSV format documented in `methods/ensemble/policy_manifest.py`. Each row builds one `release_policy_dict` (four MOEA reservoirs) and runs one full-basin Pywr job. Optional column `inflow_ensemble_indices` (legacy name; comma-separated ints) turns on native multi-scenario inflows; output stems include a slug of those indices so caches do not collide.
 
-- Example CSV: `data/examples/policy_batch_manifest.example.csv`
 - Driver: `python -m methods.ensemble.run_policy_manifest --manifest <path> [--dry-run] [--limit N] [--pywr-inflow-type ...] [--pywr-start ... --pywr-end ...]`
 - **Flow mode:** non-MRF Borg rows default to `perfect_foresight` in Pywr; MRF regression bundle → `regression_disagg`; MRF `perfect` → `perfect_foresight` (override with `flow_prediction_mode` when consistent).
 - Optional multi-scenario inflows: set `CEE_INFLOW_ENSEMBLE_INDICES=0,1,...` when running ensemble-style Pywr setups (stem includes a scenario slug).
@@ -482,7 +457,7 @@ Install / use the MOEA Framework 5 CLI (see `moeaframework/moeaframework_workflo
 
 ```bash
 export SEED_FROM=1 SEED_TO=10
-# Must match # objectives in templates/1-header-file_*.txt (4 for current pywrdrb EPSILONS)
+# Must match the objective count expected by your MOEA workflow setup
 export EPSILON=0.01,0.01,0.01,0.01
 bash run_moea_workflow.sh
 # or: bash run_moea_workflow.sh --cli "$(pwd)/MOEAFramework-5.0/cli"
@@ -493,7 +468,7 @@ Artifacts:
 - `moeaframework/outputs/Policy_*/refsets/<reservoir>/` — merged `seed*.ref`, global `<reservoir>.ref`
 - `moeaframework/outputs/Policy_*/metrics/<reservoir>/` — `*.metric` files (quality vs global reference)
 
-Custom problem JARs under `MOEAFramework-5.0/native/*/Makefile` must match the `# Problem=` names in `templates/1-header-file_*.txt` (`RBF_Custom`, `PWL_Custom`, `STARFIT_Custom`). See `moeaframework_workflow.md` for `BuildProblem` / `make`.
+Custom problem JARs under `MOEAFramework-5.0/native/*/Makefile` must match your MOEA header/problem naming. See `moeaframework_workflow.md` for `BuildProblem` / `make`.
 
 ## Reproducibility knobs
 
