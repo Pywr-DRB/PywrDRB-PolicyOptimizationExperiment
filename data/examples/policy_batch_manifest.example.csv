@@ -1,3 +1,0 @@
-batch_scenario,shared_policy,aligned_row,blueMarsh_policy,blueMarsh_row,beltzvilleCombined_policy,beltzvilleCombined_row,fewalter_policy,fewalter_row,prompton_policy,prompton_row,borg_seed,mrf_filtered,mrf_filter_tag,flow_prediction_mode,pywr_inflow_type,inflow_ensemble_indices,note
-demo_aligned,STARFIT,0,,,,,,,,,71,1,perfect,perfect_foresight,pub_nhmv10_BC_withObsScaled,,aligned iloc0; add quoted inflow_ensemble_indices only if catchment_inflow_mgd.hdf5 exists under pywrdrb data/flows
-demo_mixed,,,STARFIT,0,PWL,0,STARFIT,0,RBF,0,71,1,regression_disagg,regression_disagg,pub_nhmv10_BC_withObsScaled,,mixed policies per reservoir; fewalter uses STARFIT (regression MRF bundle has 0 feasible RBF rows)

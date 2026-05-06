@@ -36,7 +36,7 @@ This README now reflects the refactor that moved most reusable logic from root s
 | `methods/preprocessing/build_mrf_active_masks.py` | Pywr-DRB helper used by `build_mrf_masking_folder.sh` (contributions CSV + active-range JSON per bundle) |
 | `methods/postprocess/summarize_optimization.py` | Counts Borg solutions before/after objective filtering (uses same env as figures) |
 | `methods/postprocess/plot_baseline_dynamics.py` | Observed vs default Pywr series for baseline metric windows |
-| `methods/config.py` | Single source of truth for config/context (seeds, bounds, metrics) |
+| `methods/config.py` | Local path/compatibility layer that re-exports canonical settings from `pywrdrb.release_policies.config` |
 | `methods/borg_paths.py` | Resolves `outputs/MMBorg_*.csv` paths from `CEE_BORG_*` / `CEE_MRF_*` environment variables |
 | `methods/reservoir/model.py` | Standalone Reservoir model implementation |
 | `methods/load/` | Loaders for results and observations |
@@ -185,7 +185,7 @@ Check queue status:
 squeue -u ms3654
 ```
 
-The following are defined in `methods/config.py` and can be changed there:
+The following are available through `methods/config.py` (re-exported from `pywrdrb.release_policies.config`, except local path helpers):
 - Metrics
 - Epsilon values
 - Parameter bounds
@@ -446,7 +446,7 @@ Custom problem JARs under `MOEAFramework-5.0/native/*/Makefile` must match the `
 
 ## Reproducibility knobs
 
-Key parameters and settings are centralized in `methods/config.py`:
+Key parameters and settings should be maintained in `pywrdrb.release_policies.config` (and are surfaced here via `methods/config.py`):
 
 - `SEED` (default: 71)
 - `NFE` (default: 30000)
@@ -482,7 +482,7 @@ Additional reproducibility controls:
   - `build_mrf_masking_folder.sh` — can be run standalone to refresh `preprocessing_outputs/masking/` only
   - `run_postprocessing_and_figures.sh` — baselines, three optimization summaries, three figure trees
 
-Note: there are currently two `config.py` files - one in this repo and one in the Pywr-DRB repo. They are kept aligned, but the main configuration lives in the Pywr-DRB branch.
+Upgrade note: there are two `config.py` files, but the canonical version is `pywrdrb.release_policies.config` in the release-policy branch. Keep seeds/objectives/bounds authoritative there; use `methods/config.py` in this repo only for local paths, wrappers, and backward-compatible aliases.
 
 ## Policy sources
 

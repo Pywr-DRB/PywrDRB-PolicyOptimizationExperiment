@@ -1,5 +1,0 @@
-reservoir,policy_id,source_csv,row_index,moea_policy,selection_note
-beltzvilleCombined,best_average_all,../../outputs/MMBorg_4M_STARFIT_beltzvilleCombined_nfe100000_seed71_mrffiltered_regression.csv,0,STARFIT,Normalized equal-weight mean optimum
-blueMarsh,best_average_all,../../outputs/MMBorg_4M_STARFIT_blueMarsh_nfe100000_seed71_mrffiltered_regression.csv,3,STARFIT,Normalized equal-weight mean optimum
-fewalter,best_average_all,../../outputs/MMBorg_4M_STARFIT_fewalter_nfe100000_seed71_mrffiltered_regression.csv,0,STARFIT,Normalized equal-weight mean optimum
-prompton,best_average_all,../../outputs/MMBorg_4M_STARFIT_prompton_nfe100000_seed71_mrffiltered_regression.csv,114,STARFIT,Normalized equal-weight mean optimum

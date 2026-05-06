@@ -1,5 +1,0 @@
-# Version=5
-# Problem=PWL_Custom
-# NumberOfVariables=21
-# NumberOfObjectives=4
-# NumberOfConstraints=0
