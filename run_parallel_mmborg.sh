@@ -1,23 +1,20 @@
 #!/bin/bash
-# --- Default: run THREE sequential sweeps (same policy × reservoir grid each time) ---
-#   1) full        — USE_MRF=false → MMBorg_*_seed72.csv (no _mrffiltered_; BORG_SEED_UNMASKED)
-#   2) regression  — USE_MRF=true, pub-reconstruction JSON → *_seed71_mrffiltered_regression.csv
-#   3) perfect     — USE_MRF=true, perfect-information JSON → *_seed71_mrffiltered_perfect.csv
+# Default behavior: run three sequential sweeps over the same policy x reservoir grid.
+#   1) full       -> USE_MRF=false, outputs MMBorg_*_seed72.csv (no _mrffiltered_)
+#   2) regression -> USE_MRF=true + pub-reconstruction JSON, outputs *_seed71_mrffiltered_regression.csv
+#   3) perfect    -> USE_MRF=true + perfect-information JSON, outputs *_seed71_mrffiltered_perfect.csv
 #
-#   CEE_BORG_MODES   comma-separated subset or reorder (default: full,regression,perfect).
-#                    Aliases for (2): regression_disagg / mrffiltered_regression → regression;
-#                    for (3): pi / perfect_information / mrffiltered_perfect → perfect.
+# Main phase selector:
+#   CEE_BORG_MODES=full,regression,perfect
+#   (Use only canonical tokens: full, regression, perfect.)
 #
-# --- Other env (override: VAR=value sbatch run_parallel_mmborg.sh) ---
-#   BORG_SEED_MASKED     seed when MRF masking ON  (default 71)
-#   BORG_SEED_UNMASKED   seed when masking OFF     (default 72)
-#   MRF_RANGES_JSON      if set, used for BOTH regression and perfect phases (overrides per-phase paths)
-#   CEE_MRF_MASK_TAG     normally set from phase; only needed if you force MRF_RANGES_JSON alone
-#   CEE_BORG_RESERVOIRS  space-separated subset of reservoirs
-#   CEE_BORG_POLICY_TYPES / CEE_BORG_STARFIT_ONLY — see header in previous revisions
-#
-# Legacy single-phase (old behavior): CEE_BORG_SINGLE_PHASE=1 and set USE_MRF / CEE_MRF_MASK_SOURCE
-#
+# Other env overrides (VAR=value sbatch run_parallel_mmborg.sh):
+#   BORG_SEED_MASKED
+#   BORG_SEED_UNMASKED
+#   MRF_RANGES_JSON
+#   CEE_MRF_FILTER_TAG
+#   CEE_BORG_RESERVOIRS
+#   CEE_BORG_POLICY_TYPES / CEE_BORG_STARFIT_ONLY
 #SBATCH --job-name=ResBorg
 # Log paths: ./logs must exist when the job starts (Slurm opens them before this script runs).
 # The repo tracks logs/.gitkeep so clone has ./logs; otherwise: mkdir -p logs && sbatch ...
@@ -29,6 +26,10 @@
 #SBATCH --mail-type=END                    # Send email at job end
 #SBATCH --mail-user=ms3654@cornell.edu     # Email for notifications
 
+# -----------------------------------------------------------------------------
+# Runtime context: always execute from submit directory/repo root so relative
+# paths (Borg script, masking JSON, logs, outputs) resolve the same on all ranks.
+# -----------------------------------------------------------------------------
 if [[ -n "${SLURM_SUBMIT_DIR:-}" ]]; then
   SCRIPT_DIR="${SLURM_SUBMIT_DIR}"
 else
@@ -43,6 +44,9 @@ BORG_SCRIPT="${SCRIPT_DIR}/03_parallel_borg_run.py"
 _PUB_JSON="${SCRIPT_DIR}/preprocessing_outputs/masking/pub_reconstruction/lower_basin_mrf_active_ranges.json"
 _PERF_JSON="${SCRIPT_DIR}/preprocessing_outputs/masking/perfect_information/lower_basin_mrf_active_ranges.json"
 
+# -----------------------------------------------------------------------------
+# Environment/bootstrap: pin Python + BLAS/OpenMP threading for stable MPI runs.
+# -----------------------------------------------------------------------------
 module load python/3.11.5
 source /home/fs02/pmr82_0001/ms3654/envs/borg-env/bin/activate
 
@@ -57,6 +61,10 @@ export PYTHONOPTIMIZE=1
 BORG_SEED_MASKED="${BORG_SEED_MASKED:-71}"
 BORG_SEED_UNMASKED="${BORG_SEED_UNMASKED:-72}"
 
+# -----------------------------------------------------------------------------
+# Worklist selection: default lower-basin calibration set, with env overrides
+# for subsets (useful for debug runs or reduced sweeps).
+# -----------------------------------------------------------------------------
 RESERVOIR_NAMES=("fewalter" "prompton" "beltzvilleCombined" "blueMarsh")
 if [[ -n "${CEE_BORG_RESERVOIRS:-}" ]]; then
   read -r -a RESERVOIR_NAMES <<< "${CEE_BORG_RESERVOIRS}"
@@ -79,102 +87,10 @@ _normalize_borg_phase() {
   local x
   x="$(echo "$1" | tr '[:upper:]' '[:lower:]' | tr -d '[:space:]')"
   case "$x" in
-    full|full_series|unmasked) echo full ;;
-    regression|regression_disagg|mrffiltered_regression) echo regression ;;
-    perfect|pi|perfect_information|mrffiltered_perfect) echo perfect ;;
+    full|regression|perfect) echo "$x" ;;
     *) echo "$x" ;;
   esac
 }
-
-# --- Legacy single-phase mode (optional) ---
-_sing="$(echo "${CEE_BORG_SINGLE_PHASE:-0}" | tr '[:upper:]' '[:lower:]')"
-if [[ "$_sing" =~ ^(1|true|yes|on)$ ]]; then
-  _mrf_raw="$(echo "${USE_MRF:-true}" | tr '[:upper:]' '[:lower:]')"
-  case "$_mrf_raw" in
-    true|1|yes|on) USE_MRF_FLAG=1 ;;
-    *) USE_MRF_FLAG=0 ;;
-  esac
-  if [[ "$USE_MRF_FLAG" -eq 1 ]]; then
-    if [[ -n "${MRF_RANGES_JSON:-}" ]]; then
-      _chk="${MRF_RANGES_JSON}"
-    else
-      case "${CEE_MRF_MASK_SOURCE:-regression_disagg}" in
-        perfect|perfect_information|pi) _chk="$_PERF_JSON" ;;
-        *) _chk="$_PUB_JSON" ;;
-      esac
-    fi
-    if [[ ! -f "$_chk" ]]; then
-      echo "ERROR: USE_MRF=true but MRF JSON missing: ${_chk}" >&2
-      exit 1
-    fi
-    echo "[MRF] required JSON present: ${_chk}"
-  fi
-
-  submit_job() {
-    local POLICY_TYPE=$1
-    local RESERVOIR_NAME=$2
-    datetime=$(date '+%Y-%m-%d %H:%M:%S')
-    n_processors=$(($SLURM_NNODES * $SLURM_NTASKS_PER_NODE))
-    local RUN_SEED
-    if [[ -n "${MRF_RANGES_JSON:-}" ]]; then
-      :
-    else
-      case "${CEE_MRF_MASK_SOURCE:-regression_disagg}" in
-        perfect|perfect_information|pi)
-          MRF_RANGES_JSON="$_PERF_JSON"
-          ;;
-        *)
-          MRF_RANGES_JSON="$_PUB_JSON"
-          ;;
-      esac
-    fi
-    if [[ " ${MRF_RESERVOIRS[@]} " =~ " ${RESERVOIR_NAME} " ]]; then
-        if [[ "$USE_MRF_FLAG" -eq 1 ]]; then
-            RUN_SEED="$BORG_SEED_MASKED"
-            if [[ -z "${CEE_MRF_MASK_TAG:-}" ]]; then
-              case "${CEE_MRF_MASK_SOURCE:-regression_disagg}" in
-                perfect|perfect_information|pi) export CEE_MRF_MASK_TAG=perfect ;;
-                *) export CEE_MRF_MASK_TAG=regression_disagg ;;
-              esac
-            fi
-            echo "Running: POLICY_TYPE=$POLICY_TYPE, RESERVOIR_NAME=$RESERVOIR_NAME seed=$RUN_SEED USE_MRF=true (MRF-filtered objectives, tag=_mrffiltered_${CEE_MRF_MASK_TAG})"
-            echo "Datetime: $datetime"
-            echo "Total processors: $n_processors"
-            echo "  [MRF] Masked objectives — JSON: $MRF_RANGES_JSON"
-            time mpirun --wdir "$SCRIPT_DIR" --bind-to core --map-by ppr:${SLURM_NTASKS_PER_NODE}:node -np "$n_processors" \
-                python "$BORG_SCRIPT" "$POLICY_TYPE" "$RESERVOIR_NAME" "$RUN_SEED" "$MRF_RANGES_JSON" "true"
-        else
-            unset CEE_MRF_MASK_TAG
-            RUN_SEED="$BORG_SEED_UNMASKED"
-            echo "Running: POLICY_TYPE=$POLICY_TYPE, RESERVOIR_NAME=$RESERVOIR_NAME seed=$RUN_SEED USE_MRF=false (full series)"
-            echo "Datetime: $datetime"
-            echo "Total processors: $n_processors"
-            time mpirun --wdir "$SCRIPT_DIR" --bind-to core --map-by ppr:${SLURM_NTASKS_PER_NODE}:node -np "$n_processors" \
-                python "$BORG_SCRIPT" "$POLICY_TYPE" "$RESERVOIR_NAME" "$RUN_SEED"
-        fi
-    else
-        unset CEE_MRF_MASK_TAG
-        RUN_SEED="$BORG_SEED_UNMASKED"
-        echo "Running: POLICY_TYPE=$POLICY_TYPE, RESERVOIR_NAME=$RESERVOIR_NAME seed=$RUN_SEED (non-DRB, full series)"
-        echo "Datetime: $datetime"
-        echo "Total processors: $n_processors"
-        time mpirun --wdir "$SCRIPT_DIR" --bind-to core --map-by ppr:${SLURM_NTASKS_PER_NODE}:node -np "$n_processors" \
-            python "$BORG_SCRIPT" "$POLICY_TYPE" "$RESERVOIR_NAME" "$RUN_SEED"
-    fi
-    echo "Finished: POLICY_TYPE=$POLICY_TYPE, RESERVOIR_NAME=$RESERVOIR_NAME"
-    echo "#############################################"
-    wait
-  }
-
-  for POLICY_TYPE in "${POLICY_TYPES[@]}"; do
-    for RESERVOIR_NAME in "${RESERVOIR_NAMES[@]}"; do
-      echo "Submitting job for $POLICY_TYPE - $RESERVOIR_NAME"
-      submit_job "$POLICY_TYPE" "$RESERVOIR_NAME"
-    done
-  done
-  echo "All jobs completed."
-  exit 0
-fi
 
 # --- Default: multi-phase (full + regression MRF + perfect MRF) ---
 IFS=',' read -r -a _PHASES_RAW <<< "${CEE_BORG_MODES:-full,regression,perfect}"
@@ -185,6 +101,7 @@ for _p in "${_PHASES_RAW[@]}"; do
 done
 echo "[phases] CEE_BORG_MODES -> ${PHASES[*]}"
 
+# Fail fast before starting MPI if required mask JSONs are missing.
 for ph in "${PHASES[@]}"; do
   case "$ph" in
     full) ;;
@@ -214,11 +131,13 @@ submit_job() {
     datetime=$(date '+%Y-%m-%d %H:%M:%S')
     n_processors=$(($SLURM_NNODES * $SLURM_NTASKS_PER_NODE))
 
+    # Per-job phase context: determines whether objectives are masked and
+    # which seed / JSON / suffix are used in output naming.
     local RUN_SEED
     if [[ "$USE_MRF_FLAG" -eq 1 ]]; then
       if [[ -z "${MRF_RANGES_JSON:-}" ]]; then
-        case "${CEE_MRF_MASK_SOURCE:-regression_disagg}" in
-          perfect|perfect_information|pi)
+        case "${CEE_MRF_FILTER_SOURCE:-regression_disagg}" in
+          perfect)
             MRF_RANGES_JSON="$_PERF_JSON"
             ;;
           *)
@@ -233,20 +152,20 @@ submit_job() {
     if [[ " ${MRF_RESERVOIRS[@]} " =~ " ${RESERVOIR_NAME} " ]]; then
         if [[ "$USE_MRF_FLAG" -eq 1 ]]; then
             RUN_SEED="$BORG_SEED_MASKED"
-            if [[ -z "${CEE_MRF_MASK_TAG:-}" ]]; then
-              case "${CEE_MRF_MASK_SOURCE:-regression_disagg}" in
-                perfect|perfect_information|pi) export CEE_MRF_MASK_TAG=perfect ;;
-                *) export CEE_MRF_MASK_TAG=regression_disagg ;;
+            if [[ -z "${CEE_MRF_FILTER_TAG:-}" ]]; then
+              case "${CEE_MRF_FILTER_SOURCE:-regression_disagg}" in
+                perfect) export CEE_MRF_FILTER_TAG=perfect ;;
+                *) export CEE_MRF_FILTER_TAG=regression_disagg ;;
               esac
             fi
-            echo "Running: POLICY_TYPE=$POLICY_TYPE, RESERVOIR_NAME=$RESERVOIR_NAME seed=$RUN_SEED USE_MRF=true (MRF-filtered objectives, tag=_mrffiltered_${CEE_MRF_MASK_TAG})"
+            echo "Running: POLICY_TYPE=$POLICY_TYPE, RESERVOIR_NAME=$RESERVOIR_NAME seed=$RUN_SEED USE_MRF=true (MRF-filtered objectives, tag=_mrffiltered_${CEE_MRF_FILTER_TAG})"
             echo "Datetime: $datetime"
             echo "Total processors: $n_processors"
             echo "  [MRF] Masked objectives — JSON: $MRF_RANGES_JSON"
             time mpirun --wdir "$SCRIPT_DIR" --bind-to core --map-by ppr:${SLURM_NTASKS_PER_NODE}:node -np "$n_processors" \
                 python "$BORG_SCRIPT" "$POLICY_TYPE" "$RESERVOIR_NAME" "$RUN_SEED" "$MRF_RANGES_JSON" "true"
         else
-            unset CEE_MRF_MASK_TAG
+            unset CEE_MRF_FILTER_TAG
             RUN_SEED="$BORG_SEED_UNMASKED"
             echo "Running: POLICY_TYPE=$POLICY_TYPE, RESERVOIR_NAME=$RESERVOIR_NAME seed=$RUN_SEED USE_MRF=false (full series)"
             echo "Datetime: $datetime"
@@ -255,7 +174,7 @@ submit_job() {
                 python "$BORG_SCRIPT" "$POLICY_TYPE" "$RESERVOIR_NAME" "$RUN_SEED"
         fi
     else
-        unset CEE_MRF_MASK_TAG
+        unset CEE_MRF_FILTER_TAG
         RUN_SEED="$BORG_SEED_UNMASKED"
         echo "Running: POLICY_TYPE=$POLICY_TYPE, RESERVOIR_NAME=$RESERVOIR_NAME seed=$RUN_SEED (non-DRB, full series)"
         echo "Datetime: $datetime"
@@ -269,6 +188,8 @@ submit_job() {
     wait
 }
 
+# Phase loop sets global env flags consumed by both shell wrapper and
+# 03_parallel_borg_run.py (CEE_USE_MRF / CEE_MRF_FILTER_SOURCE / JSON path).
 for PHASE in "${PHASES[@]}"; do
   echo ""
   echo "###################################################################"
@@ -278,23 +199,23 @@ for PHASE in "${PHASES[@]}"; do
   case "$PHASE" in
     full)
       USE_MRF_FLAG=0
-      unset CEE_MRF_MASK_TAG
+      unset CEE_MRF_FILTER_TAG
       export CEE_USE_MRF=0
-      export CEE_MRF_MASK_SOURCE=regression_disagg
+      export CEE_MRF_FILTER_SOURCE=regression_disagg
       ;;
     regression)
       USE_MRF_FLAG=1
       export CEE_USE_MRF=1
-      export CEE_MRF_MASK_SOURCE=regression_disagg
-      unset CEE_MRF_MASK_TAG
+      export CEE_MRF_FILTER_SOURCE=regression_disagg
+      unset CEE_MRF_FILTER_TAG
       export MRF_RANGES_JSON="$_PUB_JSON"
       echo "[phase regression] JSON: $MRF_RANGES_JSON"
       ;;
     perfect)
       USE_MRF_FLAG=1
       export CEE_USE_MRF=1
-      export CEE_MRF_MASK_SOURCE=perfect
-      unset CEE_MRF_MASK_TAG
+      export CEE_MRF_FILTER_SOURCE=perfect
+      unset CEE_MRF_FILTER_TAG
       export MRF_RANGES_JSON="$_PERF_JSON"
       echo "[phase perfect] JSON: $MRF_RANGES_JSON"
       ;;
