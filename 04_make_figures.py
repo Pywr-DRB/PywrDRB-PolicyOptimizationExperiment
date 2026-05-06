@@ -17,9 +17,6 @@ Generate them after the MPI sweep with::
 Reads Borg optimization CSVs and cached simulation artifacts; does not run Pywr ``model.run()`` unless
 not in plots-only mode (see ``CEE_PLOTS_ONLY`` / ``CEE_SKIP_SIMULATIONS``).
 
-``CEE_TRENTON_TARGET_MGD`` is still used by validation plotting and by ``methods/figures_stage3`` when
-you run full-Pareto figures separately.
-
 Examples::
 
   python 04_make_figures.py --figures 1-6 7-11

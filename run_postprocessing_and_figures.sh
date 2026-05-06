@@ -17,14 +17,6 @@
 #
 # Override any default with env vars at submit time (see below).
 #
-# Trenton target override (VERY IMPORTANT):
-# - This script does not set the Trenton target itself; it forwards the environment.
-# - Any child call that reads ``CEE_TRENTON_TARGET_MGD`` (e.g., validation plots; full-Pareto figs 12–21 when run separately)
-#   will use the value you export at submit time.
-# - Default in code is 1938.950669 MGD (Pywr-DRB baseline).
-# - +30% sensitivity example:
-#     CEE_TRENTON_TARGET_MGD=2520.6358697 sbatch run_postprocessing_and_figures.sh
-#
 #   | Borg bundle | CEE_FIG_SUBDIR                     | Pywr flow (env)              |
 #   |--------------------------------|------------------------------------|------------------------------|
 #   | Full-series (no MRF filter)    | borg_full_series                   | FLOW_MODE_FULL |
