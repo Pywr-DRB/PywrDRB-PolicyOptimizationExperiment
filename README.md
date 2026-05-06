@@ -127,6 +127,19 @@ ls figures
 
 **Python version:** use **3.10+** (3.11 recommended). The login-node default `python` on some clusters is older; if you see `future feature annotations is not defined` or similar syntax errors, load a modern module and use your venv before running `04_make_figures.py` or `python -m methods.ensemble.postprocess_sim`.
 
+**Important:** this workflow expects `pywrdrb` from the **`release-policy`** branch, because core settings are sourced from `pywrdrb.release_policies.config`.
+
+Quick check in your active environment:
+
+```bash
+python - <<'PY'
+import pywrdrb
+from pywrdrb.release_policies import config
+print("pywrdrb:", pywrdrb.__file__)
+print("release_policies config:", config.__file__)
+PY
+```
+
 On Hopper:
 
 ```bash
@@ -165,7 +178,7 @@ Submit the multi-reservoir x multi-policy sweep with `run_parallel_mmborg.sh`.
 
 ### MRF masking folder and optimization filenames
 
-**Recommended workflow:** run **`build_mrf_masking_folder.sh`** once (after `module load` / venv) so the bundle you need exists (`pub_reconstruction` and/or `perfect_information`). When **`USE_MRF=true`**, each `run_parallel_*` job checks that the JSON it will use (from **`MRF_RANGES_JSON`** or **`CEE_MRF_MASK_SOURCE`**) is present and **exits immediately** if not. **`USE_MRF=false`** skips that check.
+**Recommended workflow:** run **`build_mrf_masking_folder.sh`** once (after `module load` / venv) so the bundle you need exists (`pub_reconstruction` and/or `perfect_information`). When **`USE_MRF=true`**, each `run_parallel_*` job checks that the JSON it will use (from **`MRF_RANGES_JSON`** or **`CEE_MRF_FILTER_SOURCE`**) is present and **exits immediately** if not. **`USE_MRF=false`** skips that check.
 
 Bundles:
 
@@ -176,10 +189,10 @@ Customize the build with env vars in `build_mrf_masking_folder.sh`. **Pub:** if 
 
 When **`USE_MRF=true`**, Borg writes CSVs/runtime files with an explicit **`_mrffiltered_*`** suffix so regression (pub-reconstruction JSON) and perfect filtered runs do not overwrite each other:
 
-- `..._seed{N}_mrffiltered_regression.*` — objectives filtered using the **pub reconstruction** MRF JSON (`CEE_MRF_MASK_SOURCE=regression_disagg` by default in the Slurm drivers).
-- `..._seed{N}_mrffiltered_perfect.*` — objectives filtered using the **perfect-information** JSON (`CEE_MRF_MASK_SOURCE=perfect`).
+- `..._seed{N}_mrffiltered_regression.*` — objectives filtered using the **pub reconstruction** MRF JSON (`CEE_MRF_FILTER_SOURCE=regression_disagg` by default in the Slurm drivers).
+- `..._seed{N}_mrffiltered_perfect.*` — objectives filtered using the **perfect-information** JSON (`CEE_MRF_FILTER_SOURCE=perfect`).
 
-Full-series runs omit the `_mrffiltered_*` token and use `BORG_SEED_UNMASKED` (default 72). The Slurm scripts set **`CEE_MRF_MASK_TAG`** (e.g. `regression_disagg` / `perfect`) for filtered jobs so `methods/borg_paths.py` resolves the correct file.
+Full-series runs omit the `_mrffiltered_*` token and use `BORG_SEED_UNMASKED` (default 72). The Slurm scripts set **`CEE_MRF_FILTER_TAG`** (e.g. `regression_disagg` / `perfect`) for filtered jobs so `methods/borg_paths.py` resolves the correct file.
 
 ### Common submission commands (filtered/full-series, single/multiseed)
 
@@ -196,11 +209,11 @@ sbatch run_parallel_mmborg_multiseed.sh
 CEE_BORG_MODES=regression,perfect sbatch run_parallel_mmborg.sh
 ```
 
-**Legacy single-mode sweep** (one `USE_MRF` / JSON choice for the whole job): set **`CEE_BORG_SINGLE_PHASE=1`** and the same variables as before (`USE_MRF`, `CEE_MRF_MASK_SOURCE`, optional `MRF_RANGES_JSON`).
+**Legacy single-mode sweep** (one `USE_MRF` / JSON choice for the whole job): set **`CEE_BORG_SINGLE_PHASE=1`** and use `USE_MRF`, `CEE_MRF_FILTER_SOURCE`, and optional `MRF_RANGES_JSON`.
 
 ```bash
 # Example: regression-filtered bundle only, single-seed driver
-CEE_BORG_SINGLE_PHASE=1 USE_MRF=true CEE_MRF_MASK_SOURCE=regression_disagg \
+CEE_BORG_SINGLE_PHASE=1 USE_MRF=true CEE_MRF_FILTER_SOURCE=regression_disagg \
   sbatch -o logs/masked_regr_%j.out -e logs/masked_regr_%j.err run_parallel_mmborg.sh
 
 # Example: multiseed loop with one mode only
@@ -227,32 +240,11 @@ After optimization completes, generate Pareto comparisons, parallel axes, dynami
 sbatch run_postprocessing_and_figures.sh
 ```
 
-### Trenton target setting (important)
-
-Figures that draw a Trenton target line (validation figures and full-Pareto figures 14–23) use:
-
-- default `DEFAULT_TRENTON_TARGET_MGD = 1938.950669` (aligned with Pywr-DRB `mrf_baseline_delTrenton`)
-- optional override via `CEE_TRENTON_TARGET_MGD`
-
-For the **+30% target** case used in sensitivity runs, set:
-
-- `CEE_TRENTON_TARGET_MGD=2520.6358697` (=`1938.950669 * 1.30`)
-
-Examples:
-
-```bash
-# Full postprocessing + figures with +30% Trenton target
-CEE_TRENTON_TARGET_MGD=2520.6358697 sbatch run_postprocessing_and_figures.sh
-
-# Full-Pareto manifest figures 14–23 with +30% Trenton target
-CEE_TRENTON_TARGET_MGD=2520.6358697 python -m methods.figures_stage3.plot_stage3_full_pareto_figures --which all
-```
-
 Borg result CSVs are resolved by **`methods/borg_paths.py`** using:
 
-- `CEE_BORG_SEED` (or `CEE_SEED`) — must match the sweep (`BORG_SEED_FILTERED` or legacy `BORG_SEED_MASKED` / `BORG_SEED_UNMASKED` in `run_parallel_mmborg.sh` and `run_postprocessing_and_figures.sh`, defaults 71 / 72).
-- `CEE_BORG_MRF_FILTERED` — `1` for MRF-filtered objectives, `0` for full-series (deprecated alias: `CEE_BORG_MRFMASKED`).
-- `CEE_MRF_FILTER_TAG` or `CEE_MRF_FILTER_SOURCE` — user-facing names such as **`regression_disagg`** or **`perfect`** map to on-disk `*_mrffiltered_regression.csv` / `*_mrffiltered_perfect.csv` (see `methods/borg_paths.py`; deprecated: `CEE_MRF_MASK_*`).
+- `CEE_BORG_SEED` (or `CEE_SEED`) — must match the sweep (`BORG_SEED_FILTERED` or `BORG_SEED_UNMASKED` in `run_parallel_mmborg.sh` and `run_postprocessing_and_figures.sh`, defaults 71 / 72).
+- `CEE_BORG_MRF_FILTERED` — `1` for MRF-filtered objectives, `0` for full-series.
+- `CEE_MRF_FILTER_TAG` or `CEE_MRF_FILTER_SOURCE` — user-facing names such as **`regression_disagg`** or **`perfect`** map to on-disk `*_mrffiltered_regression.csv` / `*_mrffiltered_perfect.csv` (see `methods/borg_paths.py`).
 - `CEE_FIG_SUBDIR` — subfolder under `figures/` (e.g. `borg_mrffiltered_regression`) so runs do not overwrite each other.
 - `CEE_PYWR_WORK_DIR` — Pywr JSON + parametric HDF5 for stage 1 (Figs 4–6) and stage 2 (7–11); shared cache naming (default `pywr_data/pywr_tmp_runs`). Legacy `CEE_PYWR_PICK_HDF5_DIR` is unused for parametric runs after the unified cache change.
 
@@ -488,7 +480,7 @@ For reproducible reruns, these are the primary switches to communicate to collab
 
 - `run_parallel_mmborg.sh` / `run_parallel_mmborg_multiseed.sh`:
   - `CEE_BORG_MODES=full,regression,perfect` (default three-phase sweep; subset/reorder as needed)
-  - `CEE_BORG_SINGLE_PHASE=1` with `USE_MRF=true|false` and `CEE_MRF_MASK_SOURCE=regression_disagg|perfect` (legacy one-mode sweep)
+  - `CEE_BORG_SINGLE_PHASE=1` with `USE_MRF=true|false` and `CEE_MRF_FILTER_SOURCE=regression_disagg|perfect` (legacy one-mode sweep)
   - `BORG_SEED_UNMASKED` (full-series) and `BORG_SEED_MASKED` (MRF-filtered)
 - `03_parallel_borg_run.py`:
   - args: `POLICY_TYPE RESERVOIR_NAME [seed] [mrf_json] [use_mrf]`
@@ -503,12 +495,14 @@ For reproducible reruns, these are the primary switches to communicate to collab
 Additional reproducibility controls:
 
 - SLURM job files:
-  - `run_parallel_mmborg.sh` — Borg phase driver (`full`, `regression`, `perfect` by default); env: `CEE_BORG_MODES`, `CEE_BORG_SINGLE_PHASE`, `USE_MRF`, `CEE_MRF_MASK_SOURCE`, seeds, `MRF_RANGES_JSON`
+  - `run_parallel_mmborg.sh` — Borg phase driver (`full`, `regression`, `perfect` by default); env: `CEE_BORG_MODES`, `CEE_BORG_SINGLE_PHASE`, `USE_MRF`, `CEE_MRF_FILTER_SOURCE`, seeds, `MRF_RANGES_JSON`
   - `run_parallel_mmborg_multiseed.sh` — same phase logic + multiseed loops
   - `build_mrf_masking_folder.sh` — can be run standalone to refresh `preprocessing_outputs/masking/` only
   - `run_postprocessing_and_figures.sh` — baselines, three optimization summaries, three figure trees
 
 Upgrade note: there are two `config.py` files, but the canonical version is `pywrdrb.release_policies.config` in the release-policy branch. Keep seeds/objectives/bounds authoritative there; use `methods/config.py` in this repo only for local paths, wrappers, and backward-compatible aliases.
+
+Backward compatibility aliases are still accepted by scripts, but prefer the names in this README (`CEE_MRF_FILTER_*`, `CEE_BORG_MRF_FILTERED`) for new runs.
 
 ## Policy sources
 
