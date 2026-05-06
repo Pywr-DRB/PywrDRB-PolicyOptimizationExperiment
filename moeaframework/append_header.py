@@ -59,8 +59,18 @@ def main():
             for seed in range(args.seed_from, args.seed_to + 1):
                 for master in range(args.num_masters):
                     # match *anything*_seed<seed>_<master>.set in this reservoir
-                    pattern = str(rdir / f"*_*_seed{seed}_{master}.set")
-                    for set_path_str in glob.glob(pattern):
+                    patterns = [
+                        str(rdir / f"*_*_seed{seed}_{master}.set"),
+                        str(rdir / f"*_*_seed{seed}_mrffiltered_regression_{master}.set"),
+                        str(rdir / f"*_*_seed{seed}_mrffiltered_perfect_{master}.set"),
+                        str(rdir / f"*_*_seed{seed}_mrfmasked_{master}.set"),
+                        str(rdir / f"*_*_seed{seed}_mrfmasked_perfect_{master}.set"),
+                        str(rdir / f"*_*_seed{seed}_mrfmasked_regression_{master}.set"),
+                    ]
+                    matched = []
+                    for pattern in patterns:
+                        matched.extend(glob.glob(pattern))
+                    for set_path_str in sorted(set(matched)):
                         set_path = Path(set_path_str)
                         out_path = set_path.with_name(set_path.stem + "_header.set")
 

@@ -1,20 +1,30 @@
 # methods/plotting/selection_unified.py
 from __future__ import annotations
-from typing import Dict, List, Optional, Tuple
+import re
+from typing import Dict, List, Mapping, Optional, Tuple
+
 import numpy as np
 import pandas as pd
 
 from methods.config import (
     BASELINE_ALIASES,
     BASELINE_VALUE_COL,
+    OBJ_FILTER_BOUNDS,
     OBJ_LABELS,
+    SENSES_ALL,
 )
-
-import re
-from typing import List, Optional, Mapping
-
-from methods.config import (
-    OBJ_LABELS, OBJ_FILTER_BOUNDS, SENSES_ALL, BASELINE_ALIASES
+from methods.plotting.pick_labels import (
+    DESIRED_PICKS_ORDER,
+    DIVERSE_SOLUTION_1,
+    DIVERSE_SOLUTION_2,
+    MAX_HV_CONTRIBUTION_2D,
+    MAX_CURVATURE_KNEE_POINT,
+    MIN_EUCLIDEAN_L2_DISTANCE_TO_IP,
+    MIN_MANHATTAN_L1_DISTANCE_TO_IP,
+    MIN_WEIGHTED_CHEBYSHEV_DISTANCE_TO_IP,
+    NORMALIZED_EQUAL_WEIGHT_MEAN_OPTIMUM,
+    epsilon_constraint_label,
+    objective_optimum_label,
 )
 
 # ===================== Helper wiring (robust & opinionated) =====================
@@ -229,10 +239,11 @@ def best_indices_all(obj_df: pd.DataFrame,
         if not vec.notna().any():
             continue
         idx = int(vec.idxmax() if _sense_is_max(col) else vec.idxmin())
-        picks[f"Best {col}"] = idx
+        picks[objective_optimum_label(col)] = idx
 
-    # mandatory unified pick
-    picks["Best Average (All Objectives)"] = _safe_best_average_index(obj_df, objectives)
+    # Unified multi-objective average (sense-aware norms). Distinct name from legacy
+    # ``Best Average All`` (scaled min–max in ``stage1``) to avoid duplicate indices.
+    picks[NORMALIZED_EQUAL_WEIGHT_MEAN_OPTIMUM] = _safe_best_average_index(obj_df, objectives)
     return picks
 
 
@@ -264,7 +275,8 @@ def _eps_constraint(nd: pd.DataFrame, eps_on: str, optimize: str,
     for q, t in zip(qs, thr):
         sub = nd[nd[c_eps].fillna(0.5) >= t]
         if len(sub):
-            out[f"ε-constraint {eps_on} ≥ Q{int(100*q)}"] = int(sub[c_opt].idxmax())
+            q_int = int(round(100 * float(q)))
+            out[epsilon_constraint_label(eps_on, q_int, optimize)] = int(sub[c_opt].idxmax())
     return out
 
 def _knee_point_2d(nd: pd.DataFrame, objectives: List[str]) -> Optional[int]:
@@ -320,7 +332,9 @@ def _fps_diverse(nd: pd.DataFrame, objectives: List[str], k: int = 2) -> Dict[st
             break
         picks_pos.append(nxt_pos)
         # Return the ORIGINAL index label for this position
-        out[f"Diverse #{len(out)+1} (FPS)"] = nd.index[nxt_pos]
+        labels = (DIVERSE_SOLUTION_1, DIVERSE_SOLUTION_2)
+        if len(out) < len(labels):
+            out[labels[len(out)]] = nd.index[nxt_pos]
 
     return out
 
@@ -358,20 +372,7 @@ def _hv_contrib_2d(nd: pd.DataFrame, objectives: List[str]) -> Optional[int]:
     return int(ids[int(np.argmax(contrib))])
 
 # ======================== Public selection API (wired) =========================
-
-DESIRED_PICKS_ORDER = [
-    "Best Average (All Objectives)",
-    "Compromise L2 (Euclidean)",
-    "Tchebycheff L∞",
-    "Manhattan L1",
-    "Knee (max curvature)",
-    "ε-constraint Release NSE ≥ Q50",
-    "ε-constraint Release NSE ≥ Q80",
-    "Diverse #1 (FPS)",
-    "Diverse #2 (FPS)",
-    "Max HV Contribution",
-    # ... any “Best {objective}” picks are appended afterward if new indices
-]
+# DESIRED_PICKS_ORDER is defined in pick_labels.py (canonical names + filename slugs).
 
 def sophisticated_picks(obj_df: pd.DataFrame,
                         objectives: List[str]) -> Dict[str, int]:
@@ -382,21 +383,26 @@ def sophisticated_picks(obj_df: pd.DataFrame,
 
     nd = normalize_objectives(obj_df, avail, bounds=OBJ_FILTER_BOUNDS)
     out: Dict[str, int] = {}
-    out["Compromise L2 (Euclidean)"] = int(_lp_distance_to_ideal(nd, avail, 2).idxmin())
-    out["Tchebycheff L∞"]           = int(_lp_distance_to_ideal(nd, avail, np.inf).idxmin())
-    out["Manhattan L1"]             = int(_lp_distance_to_ideal(nd, avail, 1).idxmin())
+    out[MIN_EUCLIDEAN_L2_DISTANCE_TO_IP] = int(_lp_distance_to_ideal(nd, avail, 2).idxmin())
+    out[MIN_WEIGHTED_CHEBYSHEV_DISTANCE_TO_IP] = int(_lp_distance_to_ideal(nd, avail, np.inf).idxmin())
+    out[MIN_MANHATTAN_L1_DISTANCE_TO_IP] = int(_lp_distance_to_ideal(nd, avail, 1).idxmin())
 
     if len(avail) >= 2:
         kp = _knee_point_2d(nd, avail)
         if kp is not None:
-            out["Knee (max curvature)"] = kp
-        # Use the first two available objectives for the ε & HV heuristics
-        eps_on, optimize = avail[0], avail[1]
+            out[MAX_CURVATURE_KNEE_POINT] = kp
+        # Anchor ε-constraint on Release NSE when present so labels match ``stage1`` default picks
+        if "Release NSE" in avail:
+            eps_on = "Release NSE"
+            rest = [c for c in avail if c != eps_on]
+            optimize = "Storage NSE" if "Storage NSE" in rest else rest[0]
+        else:
+            eps_on, optimize = avail[0], avail[1]
         out.update(_eps_constraint(nd, eps_on, optimize, qs=(0.5, 0.8)))
         out.update(_fps_diverse(nd, avail, k=2))
         hv = _hv_contrib_2d(nd, avail)
         if hv is not None:
-            out["Max HV Contribution"] = hv
+            out[MAX_HV_CONTRIBUTION_2D] = hv
     return out
 
 
@@ -405,9 +411,9 @@ def build_unified_picks(obj_df: pd.DataFrame,
     """
     One-stop “wiring”:
       - Auto-detect present objectives
-      - Always add "Best Average (All Objectives)"
+      - Always add normalized equal-weight mean optimum (unified multi-objective average; sense-aware)
       - Add distance/knee/ε/diversity/HV picks when meaningful
-      - Add per-objective “Best …”
+      - Add per-objective optima
       - Deduplicate by solution index, preserving a sensible order
     """
     if objectives is None:
@@ -429,14 +435,23 @@ def build_unified_picks(obj_df: pd.DataFrame,
                 ordered[lab] = idx
                 seen.add(idx)
 
-    # 2) Ensure all “Best {objective}” are included too (in stable order)
+    # 2) Ensure all per-objective optima are included (in stable order)
     for col in _present_objectives(obj_df, objectives):
-        lab = f"Best {col}"
+        lab = objective_optimum_label(col)
         if lab in picks:
             idx = int(picks[lab])
             if idx not in seen:
                 ordered[lab] = idx
                 seen.add(idx)
+
+    # 3) Any remaining picks (e.g. ε-constraint with a non-default secondary objective)
+    for lab, idx in picks.items():
+        if lab in ordered:
+            continue
+        idx = int(idx)
+        if idx not in seen:
+            ordered[lab] = idx
+            seen.add(idx)
 
     return ordered
 

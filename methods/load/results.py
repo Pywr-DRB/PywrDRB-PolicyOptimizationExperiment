@@ -2,7 +2,6 @@ import pandas as pd
 from pywrdrb.release_policies.config import OBJ_FILTER_BOUNDS
 
 
-
 def filter_solutions(df: pd.DataFrame,
                      obj_bounds = OBJ_FILTER_BOUNDS) -> pd.DataFrame:
     
@@ -33,6 +32,36 @@ def filter_solutions(df: pd.DataFrame,
 
 
 
+def _transform_borg_like_dataframe(
+    results: pd.DataFrame,
+    *,
+    obj_labels=None,
+):
+    """
+    Rename ``obj*`` using ``obj_labels``, negate NSE/KGE/inertia for figure convention.
+    Returns ``(results, obj_cols_renamed, var_cols)``.
+    """
+    obj_cols = [col for col in results.columns if col.startswith("obj")]
+    var_cols = [col for col in results.columns if col.startswith("var")]
+
+    if obj_labels is not None:
+        for col in obj_cols:
+            new_col = obj_labels.get(col, col)
+            results.rename(columns={col: new_col}, inplace=True)
+
+        obj_cols = [obj_labels.get(col, col) for col in obj_cols]
+
+    for col in obj_cols:
+        if "nse" in col.lower():
+            results[col] = -results[col]
+        elif "kge" in col.lower():
+            results[col] = -results[col]
+        elif "inertia" in col.lower():
+            results[col] = -results[col]
+
+    return results, obj_cols, var_cols
+
+
 def load_results(file_path: str,
                  obj_labels=None,
                  filter=False,
@@ -46,44 +75,10 @@ def load_results(file_path: str,
     Returns:
         pd.DataFrame: DataFrame containing the results.
     """
-    
-    # Load the results from the CSV file
     results = pd.read_csv(file_path)
-    
-    # Relabel objectives if obj_labels are provided
-    obj_cols = [col for col in results.columns if col.startswith("obj")]
-    var_cols = [col for col in results.columns if col.startswith("var")]
-    
-    if obj_labels is not None:
-        for col in obj_cols:
-            # Rename the column using the provided labels
-            new_col = obj_labels.get(col, col)
-            results.rename(columns={col: new_col}, inplace=True)
-
-        # Change obj_cols to use the new labels
-        obj_cols = [obj_labels.get(col, col) for col in obj_cols]
-        
-
-    # Modify the sign of the objectives,
-    # only for specific objs (eg. NSE)
-    for col in obj_cols:
-        # NSE 
-        if ('nse' in col.lower()):
-            results[col] = -results[col]
-        elif ('kge' in col.lower()):
-            results[col] = -results[col]
-        elif ('inertia' in col.lower()):
-            results[col] = -results[col]
-
-
-    # Filter the results based on the objective bounds
-    # if filter and obj_bounds is not None:
-    #     if 'prompton' not in file_path:    
-    #         results = filter_solutions(results, obj_bounds)
-    #     else:
-    #         # prompton has f'd up Storage NSE
-    #         obj_bounds['Storage NSE'] = (-10, 1.0)
-    #         results = filter_solutions(results, obj_bounds)
+    results, obj_cols, var_cols = _transform_borg_like_dataframe(
+        results, obj_labels=obj_labels
+    )
 
     if filter and obj_bounds is not None:
         before = len(results)
@@ -91,8 +86,41 @@ def load_results(file_path: str,
         after = len(results)
         print(f"[FILTER] {file_path}: {before} → {after} rows")
 
-    # separate objectives and variables
     results_obj = results.loc[:, obj_cols]
     results_var = results.loc[:, var_cols]
-    
+
     return results_obj, results_var
+
+
+def load_results_with_metadata(
+    file_path: str,
+    obj_labels=None,
+    filter=False,
+    obj_bounds=OBJ_FILTER_BOUNDS,
+):
+    """
+    Same transformation as :func:`load_results` (rename ``obj*``, NSE sign for figures, optional filter),
+    but keeps extra CSV columns (e.g. ``moea_policy`` from ``methods/analysis/mmborg_eps_nondominated_set.py``
+    ``--per-reservoir`` output) aligned by row.
+
+    Returns ``(obj_df, var_df, meta_df)`` where ``meta_df`` has only non-``obj*`` / non-``var*``
+    columns (empty frame if none).
+    """
+    results = pd.read_csv(file_path)
+    obj_raw = [c for c in results.columns if str(c).startswith("obj")]
+    var_raw = [c for c in results.columns if str(c).startswith("var")]
+    meta_cols = [c for c in results.columns if c not in obj_raw and c not in var_raw]
+
+    results, obj_cols, var_cols = _transform_borg_like_dataframe(results, obj_labels=obj_labels)
+
+    if filter and obj_bounds is not None:
+        before = len(results)
+        results = filter_solutions(results, obj_bounds=obj_bounds)
+        after = len(results)
+        print(f"[FILTER] {file_path}: {before} → {after} rows")
+
+    meta_df = results.loc[:, meta_cols].copy() if meta_cols else pd.DataFrame(index=results.index)
+    results_obj = results.loc[:, obj_cols]
+    results_var = results.loc[:, var_cols]
+
+    return results_obj, results_var, meta_df

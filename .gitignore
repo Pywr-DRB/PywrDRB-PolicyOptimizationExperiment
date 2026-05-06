@@ -27,8 +27,9 @@ lib*
 borg.py
 MOEAFramework-5.0/
 
-#Random stuff
-logs/
+# Random stuff — keep ./logs/ in repo for SLURM (#SBATCH --output=./logs/...)
+logs/*
+!logs/.gitkeep
 data_test/
 outputs/
 # Ignore example files
@@ -40,3 +41,10 @@ moeaframework/figures_moea_metrics/
 interactive/
 figures/
 pywr_data/
+
+# Out-of-scope workflows for current STARFIT parametric merge target
+methods/analysis/run_operational_burden_figures.py
+methods/ensemble/run_full_pareto_pywr_mpi.py
+methods/figures_stage3/plot_stage3_full_pareto_figures.py
+run_full_pareto_pywr_mpi.sh
+moeaframework/*.sh

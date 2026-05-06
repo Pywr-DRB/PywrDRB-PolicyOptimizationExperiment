@@ -12,12 +12,12 @@ from matplotlib.lines import Line2D
 
 # ==== Project imports (your repo layout) ====
 from methods.config import (
-    NFE, SEED, ISLANDS,
     OBJ_LABELS, OBJ_FILTER_BOUNDS,
     reservoir_options, policy_type_options,
-    OUTPUT_DIR, FIG_DIR,
+    FIG_DIR,
     n_rbfs, n_rbf_inputs, n_segments, n_pwl_inputs
 )
+from methods.borg_paths import resolve_borg_moea_csv_path, resolve_figure_root
 from methods.load.results import load_results
 
 
@@ -102,6 +102,8 @@ def draw_rangebars(ax, stats: pd.DataFrame, color: str, title: str, x_label: str
     D = stats.copy()
     if normalize:
         D = D.apply(_normalize_row, axis=1)
+    # Positional rows only: iterrows() labels are not 0..n-1 after sort/head, but y[i] must be.
+    D = D.reset_index(drop=True)
 
     y = np.arange(len(D))[::-1]  # top to bottom
     ax.set_yticks(y)
@@ -130,7 +132,7 @@ def draw_rangebars(ax, stats: pd.DataFrame, color: str, title: str, x_label: str
 def load_policy_frames(reservoir: str, policy: str):
     """Load filtered results; return objective DF, variable DF (with renamed parameters)."""
     obj_cols = list(OBJ_LABELS.values())
-    fname = f"{OUTPUT_DIR}/MMBorg_{ISLANDS}M_{policy}_{reservoir}_nfe{NFE}_seed{SEED}.csv"
+    fname = resolve_borg_moea_csv_path(policy, reservoir)
     try:
         obj_df, var_df = load_results(fname, obj_labels=OBJ_LABELS, filter=True, obj_bounds=OBJ_FILTER_BOUNDS)
     except Exception as e:
@@ -239,7 +241,7 @@ def make_reservoir_visual(reservoir: str, outdir: str | Path | None = None):
              fontsize=9, alpha=0.7)
 
     if outdir is None:
-        outdir = Path(FIG_DIR) / "policy_range_viz"
+        outdir = Path(resolve_figure_root(FIG_DIR)) / "fig3_parameter_ranges"
     outdir = Path(outdir)
     outdir.mkdir(parents=True, exist_ok=True)
     out = outdir / f"ranges_{safe(reservoir)}.png"

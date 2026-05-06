@@ -1,4 +1,8 @@
 # methods/plotting/plot_parallel_axis.py
+from __future__ import annotations
+
+import textwrap
+
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -15,7 +19,15 @@ def get_color(value, color_by_continuous, color_palette_continuous,
     if color_by_continuous is not None:
         color = colormaps.get_cmap(color_palette_continuous)(value)
     elif color_by_categorical is not None:
-        color = color_dict_categorical[value]
+        # NaN / missing labels → treat as "Other"; unknown labels → fallback (not in palette)
+        if value is None or (isinstance(value, float) and np.isnan(value)):
+            key = "Other"
+        else:
+            key = str(value).strip()
+        if key in ("nan", "NaN", "None"):
+            key = "Other"
+        default = color_dict_categorical.get("Other", "lightgray") if color_dict_categorical else "lightgray"
+        color = color_dict_categorical.get(key, default) if color_dict_categorical else default
     return color
 
 ### function to get zorder value for ordering lines on plot. 
@@ -40,8 +52,9 @@ def reorganize_objs(objs, columns_axes, ideal_direction, minmaxs):
     
     ### reorganize & normalize data to go from 0 (bottom of figure) to 1 (top of figure), 
     if ideal_direction == 'bottom':
-        tops = objs_reorg.min(axis=0)
-        bottoms = objs_reorg.max(axis=0)
+        # 1d numpy: avoid Series integer [i] (deprecated positional access in future pandas).
+        tops = objs_reorg.min(axis=0).to_numpy(dtype=float, copy=True)
+        bottoms = objs_reorg.max(axis=0).to_numpy(dtype=float, copy=True)
         for i, minmax in enumerate(minmaxs):
             col = objs_reorg.iloc[:, i].astype(float)
             mn, mx = col.min(), col.max()
@@ -58,8 +71,8 @@ def reorganize_objs(objs, columns_axes, ideal_direction, minmaxs):
                 objs_reorg.iloc[:, i] = (objs_reorg.iloc[:, i].max(axis=0) - objs_reorg.iloc[:, i]) / \
                                         (objs_reorg.iloc[:, i].max(axis=0) - objs_reorg.iloc[:, i].min(axis=0))
     elif ideal_direction == 'top':
-        tops = objs_reorg.max(axis=0)
-        bottoms = objs_reorg.min(axis=0)
+        tops = objs_reorg.max(axis=0).to_numpy(dtype=float, copy=True)
+        bottoms = objs_reorg.min(axis=0).to_numpy(dtype=float, copy=True)
         for i, minmax in enumerate(minmaxs):
             col = objs_reorg.iloc[:, i].astype(float)
             mn, mx = col.min(), col.max()
@@ -80,6 +93,17 @@ def reorganize_objs(objs, columns_axes, ideal_direction, minmaxs):
 
     return objs_reorg, tops, bottoms
 
+
+def _wrap_legend_label(text: str, width: int) -> str:
+    """Break long pick names into multiple lines for readable legends."""
+    if width <= 0 or not str(text).strip():
+        return text
+    s = str(text).strip()
+    if len(s) <= width:
+        return s
+    return textwrap.fill(s, width=width, break_long_words=True, break_on_hyphens=True)
+
+
 ### customizable parallel coordinates plot
 def custom_parallel_coordinates(objs, columns_axes=None, axis_labels=None, 
                                 ideal_direction='top', minmaxs=None, 
@@ -89,10 +113,16 @@ def custom_parallel_coordinates(objs, columns_axes=None, axis_labels=None,
                                 zorder_by=None, zorder_num_classes=10, zorder_direction='ascending', 
                                 alpha_base=0.8, brushing_dict=None, alpha_brush=0.05, 
                                 lw_base=1.5, fontsize=14, 
-                                figsize=(11,6), fname=None,
-                                bottom_pad=0.18,        # <— NEW: extra bottom margin for legends
-                                legend_pad=0.06,        # <— NEW: distance (in axes frac) to push legend below axes
-                                legend_ncol=4         # <— NEW: max number of columns in legend
+                                figsize=(12, 7.5), fname=None,
+                                bottom_pad=0.22,
+                                legend_pad=0.06,
+                                legend_ncol=2,
+                                legend_label_width=40,
+                                legend_fontsize=None,
+                                subplot_left=0.10,
+                                subplot_right=0.97,
+                                subplot_top=0.92,
+                                footnote=None,
                                 ):
 
     ### verify that all inputs take supported values
@@ -105,9 +135,15 @@ def custom_parallel_coordinates(objs, columns_axes=None, axis_labels=None,
     columns_axes = columns_axes if (columns_axes is not None) else objs.columns
     axis_labels = axis_labels if (axis_labels is not None) else columns_axes
     
-    ### create figure
+    ### create figure (taller default figsize + margins so axes fill width without huge side gaps)
     fig,ax = plt.subplots(1,1,figsize=figsize, gridspec_kw={'hspace':0.1, 'wspace':0.1})
-    fig.subplots_adjust(bottom=bottom_pad)   # <— NEW
+    leg_fs = legend_fontsize if legend_fontsize is not None else max(9, fontsize + 1)
+    fig.subplots_adjust(
+        left=subplot_left,
+        right=subplot_right,
+        top=subplot_top,
+        bottom=bottom_pad,
+    )
 
     ### reorganize & normalize objective data
     objs_reorg, tops, bottoms = reorganize_objs(objs, columns_axes, ideal_direction, minmaxs)
@@ -268,30 +304,52 @@ def custom_parallel_coordinates(objs, columns_axes=None, axis_labels=None,
             col = color_dict_categorical[lab]
             a = (alpha_brush if (is_hl and lab == "Other") else alpha_base)
             lw_leg = (1.0 if (is_hl and lab == "Other") else max(lw_base, 2.5 if is_hl else lw_base))
-            handles.append(Line2D([0], [0], color=col, lw=lw_leg, alpha=a, label=lab))
+            wrapped = _wrap_legend_label(lab, legend_label_width)
+            handles.append(Line2D([0], [0], color=col, lw=lw_leg, alpha=a, label=wrapped))
 
         if handles:
-            # Place legend in FIGURE coords so bottom_pad/legend_pad work
-            ncols = min(legend_ncol if 'legend_ncol' in locals() else 4, len(handles))
+            # Fewer columns + wrapped labels so entries stay readable (not one ultra-wide row).
+            ncols = max(1, min(legend_ncol, len(handles)))
             leg = fig.legend(
                 handles=handles,
                 loc="lower center",
-                bbox_to_anchor=(0.5, legend_pad),   # <-- use legend_pad here
+                bbox_to_anchor=(0.5, legend_pad),
                 ncol=ncols,
                 frameon=False,
-                fontsize=fontsize
+                fontsize=leg_fs,
+                handlelength=2.4,
+                handletextpad=0.6,
+                columnspacing=1.4,
+                borderaxespad=0.8,
             )
 
             # Ensure the reserved bottom margin is big enough for the legend
             fig.canvas.draw()  # need renderer for accurate bbox
             bb = leg.get_window_extent(fig.canvas.get_renderer()).transformed(fig.transFigure.inverted())
-            needed = bb.height + legend_pad + 0.01  # small extra margin
+            needed = bb.height + legend_pad + 0.02
+            if footnote:
+                needed += 0.06
             if fig.subplotpars.bottom < needed:
                 fig.subplots_adjust(bottom=needed)
         
+    if footnote:
+        foot_w = max(48, min(100, int(figsize[0] * 8)))
+        foot_text = textwrap.fill(footnote, width=foot_w, break_long_words=False)
+        foot_fs = max(8, fontsize - 2)
+        fig.text(
+            0.5,
+            0.012,
+            foot_text,
+            ha="center",
+            va="bottom",
+            fontsize=foot_fs,
+            linespacing=1.25,
+        )
+
      ### save figure
     if fname is not None:
          plt.savefig(fname, bbox_inches='tight', dpi=300)
+         plt.close(fig)
     
     #plt.show()
     return

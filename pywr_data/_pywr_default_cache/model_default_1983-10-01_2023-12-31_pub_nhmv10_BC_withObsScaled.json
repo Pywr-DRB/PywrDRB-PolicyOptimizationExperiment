@@ -169,8 +169,8 @@
             "name": "reservoir_prompton",
             "type": "storage",
             "max_volume": "max_volume_prompton",
-            "initial_volume": 22364.816000000003,
-            "initial_volume_pc": 0.8,
+            "initial_volume": 2795.6020000000003,
+            "initial_volume_pc": 0.1,
             "cost": -10.0
         },
         {
@@ -287,7 +287,7 @@
             "name": "reservoir_beltzvilleCombined",
             "type": "storage",
             "max_volume": "max_volume_beltzvilleCombined",
-            "initial_volume": 10800.0,
+            "initial_volume": 14188.872000000001,
             "initial_volume_pc": 0.8,
             "cost": -10.0
         },
