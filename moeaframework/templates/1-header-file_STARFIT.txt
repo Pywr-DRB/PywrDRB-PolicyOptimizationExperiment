@@ -1,0 +1,5 @@
+# Version=5
+# Problem=STARFIT_Custom
+# NumberOfVariables=17
+# NumberOfObjectives=4
+# NumberOfConstraints=1

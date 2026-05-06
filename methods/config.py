@@ -64,6 +64,31 @@ MRF_MASK_JSON_PERFECT_INFO = os.path.join(
 # Buffer (days) around MRF “normal ops” windows for masking (not in pywrdrb config)
 MRF_NORMAL_OPS_BUFFER_DAYS = 5
 
+# Normal operating ranges (NOR) by reservoir, lifted from
+# ``BASE_POLICY_CONTEXT_BY_RESERVOIR`` for quick discoverability in this repo.
+# Values are expressed as storage fractions of capacity and absolute storage MG.
+NORMAL_OPERATING_RANGE_BY_RESERVOIR = {}
+for _name in reservoir_options:
+    _ctx = BASE_POLICY_CONTEXT_BY_RESERVOIR[_name]
+    _cap = float(reservoir_capacity[_name])
+    _nor_min_frac = float(
+        _ctx.get("nor_min_frac", _ctx.get("nor_lo_frac", _ctx.get("normal_min_frac", 0.0)))
+    )
+    _nor_max_frac = float(
+        _ctx.get("nor_max_frac", _ctx.get("nor_hi_frac", _ctx.get("normal_max_frac", 1.0)))
+    )
+    NORMAL_OPERATING_RANGE_BY_RESERVOIR[_name] = {
+        "nor_min_frac": _nor_min_frac,
+        "nor_max_frac": _nor_max_frac,
+        "nor_min_storage_mg": _nor_min_frac * _cap,
+        "nor_max_storage_mg": _nor_max_frac * _cap,
+    }
+
+
+def get_normal_operating_range(reservoir_name: str) -> dict:
+    """Return NOR bounds for one reservoir from :data:`NORMAL_OPERATING_RANGE_BY_RESERVOIR`."""
+    return NORMAL_OPERATING_RANGE_BY_RESERVOIR[reservoir_name]
+
 # Legacy flat dicts kept for older scripts
 reservoir_min_release = {
     name: float(BASE_POLICY_CONTEXT_BY_RESERVOIR[name]["release_min"])

@@ -454,12 +454,31 @@ Key parameters and settings are centralized in `methods/config.py`:
 - `EPSILONS`, `METRICS`, `OBJ_FILTER_BOUNDS`
 - All policy parameter bounds (STARFIT/RBF/PWL)
 - Per-reservoir capacities, inflow bounds, release min/max
+- `NORMAL_OPERATING_RANGE_BY_RESERVOIR` and `get_normal_operating_range(...)` for explicit NOR fractions and storage bounds (MG) by reservoir.
+
+### Workflow flags cheat sheet
+
+For reproducible reruns, these are the primary switches to communicate to collaborators:
+
+- `run_parallel_mmborg.sh` / `run_parallel_mmborg_multiseed.sh`:
+  - `CEE_BORG_MODES=full,regression,perfect` (default three-phase sweep; subset/reorder as needed)
+  - `CEE_BORG_SINGLE_PHASE=1` with `USE_MRF=true|false` and `CEE_MRF_MASK_SOURCE=regression_disagg|perfect` (legacy one-mode sweep)
+  - `BORG_SEED_UNMASKED` (full-series) and `BORG_SEED_MASKED` (MRF-filtered)
+- `03_parallel_borg_run.py`:
+  - args: `POLICY_TYPE RESERVOIR_NAME [seed] [mrf_json] [use_mrf]`
+  - env override: `CEE_USE_MRF=0|1` (takes precedence over argv mask flag)
+- `run_postprocessing_and_figures.sh`:
+  - `CEE_POSTPROCESS_BUNDLE=full|regression_disagg|perfect|all`
+  - `FLOW_MODE_FULL`, `FLOW_MODE_REGRESSION_DISAGG`, `FLOW_MODE_PERFECT` (Pywr flow mode per bundle)
+  - `BORG_SEED_UNMASKED`, `BORG_SEED_FILTERED`
+- `build_mrf_masking_folder.sh`:
+  - Generates `preprocessing_outputs/masking/pub_reconstruction/` and/or `.../perfect_information/` JSON/CSV artifacts used by MRF-filtered optimization phases.
 
 Additional reproducibility controls:
 
 - SLURM job files:
-  - `run_parallel_mmborg.sh` — calls `build_mrf_masking_folder.sh`, then Borg; env: `USE_MRF`, `CEE_MRF_MASK_SOURCE`, seeds, `MRF_RANGES_JSON`, skip flags for MRF prebuild
-  - `run_parallel_mmborg_multiseed.sh` — same MRF prebuild + multiseed loops
+  - `run_parallel_mmborg.sh` — Borg phase driver (`full`, `regression`, `perfect` by default); env: `CEE_BORG_MODES`, `CEE_BORG_SINGLE_PHASE`, `USE_MRF`, `CEE_MRF_MASK_SOURCE`, seeds, `MRF_RANGES_JSON`
+  - `run_parallel_mmborg_multiseed.sh` — same phase logic + multiseed loops
   - `build_mrf_masking_folder.sh` — can be run standalone to refresh `preprocessing_outputs/masking/` only
   - `run_postprocessing_and_figures.sh` — baselines, three optimization summaries, three figure trees
 
