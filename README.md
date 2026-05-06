@@ -66,6 +66,57 @@ This README now reflects the refactor that moved most reusable logic from root s
 
 ## Workflow
 
+### Quick start (fresh clone on Hopper)
+
+Run these in order for an end-to-end reproduction:
+
+```bash
+cd /path/to/projects
+git clone https://github.com/Pywr-DRB/PywrDRB-PolicyOptimizationExperiment.git
+cd PywrDRB-PolicyOptimizationExperiment
+
+module load python/3.11.5
+python -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+
+# 1) Observed-data preprocessing
+sbatch run_preprocessing.sh
+
+# 2) Build MRF masking bundles (pub + perfect JSON/CSV artifacts)
+bash build_mrf_masking_folder.sh
+
+# 3) Optimization (default phases: full, regression-filtered, perfect-filtered)
+sbatch run_parallel_mmborg.sh
+
+# 4) Postprocess + figures
+sbatch run_postprocessing_and_figures.sh
+
+# 5) Optional full-Pareto MPI + stage-3 figures
+sbatch run_full_pareto_pywr_mpi.sh
+```
+
+Useful variants:
+
+```bash
+# Only selected optimization phases
+CEE_BORG_MODES=regression,perfect sbatch run_parallel_mmborg.sh
+
+# Multiseed sweeps
+CEE_MULTISEED_FROM=1 CEE_MULTISEED_TO=10 sbatch run_parallel_mmborg_multiseed.sh
+
+# Restrict postprocess to one bundle
+CEE_POSTPROCESS_BUNDLE=full sbatch run_postprocessing_and_figures.sh
+```
+
+Quick checks:
+
+```bash
+squeue -u $USER
+ls outputs | rg "MMBorg_"
+ls figures
+```
+
 ### Stage definitions
 
 - **Stage 1 (optimization processing only):** uses optimization outputs only; no simulation runs.
