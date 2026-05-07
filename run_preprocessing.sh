@@ -24,6 +24,11 @@ echo "Starting observational data retrieval..."
 python 01_retrieve_data.py
 
 echo "Processing raw data..."
-python 02_process_data.py
+INFLOW_SOURCE_MODE="${CEE_INFLOW_SOURCE_MODE:-pub_only}"
+echo "Processing raw data with inflow source mode: ${INFLOW_SOURCE_MODE}"
+python 02_process_data.py --inflow-source "${INFLOW_SOURCE_MODE}"
 
-echo "Done with preprocessing."
+echo "Building MRF filtering bundles (regression_disagg + perfect_foresight)..."
+bash build_mrf_filtering_folder.sh
+
+echo "Done with preprocessing + MRF filtering build."

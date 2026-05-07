@@ -33,16 +33,15 @@ from methods.config import reservoir_capacity, INERTIA_BY_RESERVOIR, release_max
 from methods.config import reservoir_options
 
 from methods.preprocessing.mrf_filtering import (
-    load_mrf_ranges,
-    build_normal_ops_filter,
+    load_mrf_daily_filter_csv,
+    build_normal_ops_filter_from_daily,
     validate_filter_alignment,
 )
 from methods.borg_paths import mrf_filtered_file_suffix
 
 # Project root: do not rely on process CWD under Slurm/MPI (often job spool on some ranks).
 _CEE_ROOT = os.path.dirname(os.path.abspath(__file__))
-_DEFAULT_MRF_JSON = "preprocessing_outputs/filtering/pub_reconstruction/lower_basin_mrf_active_ranges.json"
-_LEGACY_MRF_JSON = "preprocessing_outputs/filtering/lower_basin_mrf_active_ranges.json"
+_DEFAULT_MRF_FILTER = "preprocessing_outputs/filtering/regression_disagg/mrf_active_filter_daily.csv"
 root_dir = _CEE_ROOT
 pn = PathNavigator(root_dir, max_depth=2)
 pn.chdir()
@@ -66,22 +65,15 @@ def _log(msg: str) -> None:
         print(msg, flush=True)
 
 
-def _resolve_mrf_ranges_path(path_str: str) -> Path:
-    """Resolve MRF JSON; fall back to legacy flat filtering path if the bundle path is missing."""
+def _resolve_mrf_filter_path(path_str: str) -> Path:
+    """Resolve MRF filter path relative to project root when needed."""
     p = Path(path_str)
-    cand = p if p.is_absolute() else Path(_CEE_ROOT) / p
-    if cand.exists():
-        return cand
-    leg = Path(_CEE_ROOT) / _LEGACY_MRF_JSON
-    if leg.exists():
-        _log(f"[MRF Filtering] Primary JSON missing ({cand}); using legacy path: {leg}")
-        return leg
-    return cand
+    return p if p.is_absolute() else Path(_CEE_ROOT) / p
 
 
-### CLI: POLICY_TYPE RESERVOIR_NAME [seed] [mrf_json] [use_mrf]
+### CLI: POLICY_TYPE RESERVOIR_NAME [seed] [mrf_filter_path] [use_mrf]
 #  - seed: optional; default SEED from config
-#  - mrf_json: optional path to MRF ranges JSON (default _DEFAULT_MRF_JSON under project root)
+#  - mrf_filter_path: optional path to MRF daily CSV (or legacy JSON)
 #  - use_mrf: "true"/"false" — if true, apply filtering for reservoirs in reservoir_options
 assert len(sys.argv) > 2, "POLICY_TYPE and RESERVOIR_NAME must be provided by command line."
 
@@ -91,7 +83,7 @@ RESERVOIR_NAME = str(sys.argv[2])
 borg_seed = int(sys.argv[3]) if len(sys.argv) > 3 and str(sys.argv[3]).strip() != "" else SEED
 MRF_RANGES_JSON = (
     sys.argv[4] if len(sys.argv) > 4 and str(sys.argv[4]).strip() != ""
-    else _DEFAULT_MRF_JSON
+    else _DEFAULT_MRF_FILTER
 )
 cee_mrf = os.environ.get("CEE_USE_MRF", "").strip().lower()
 if cee_mrf in ("0", "false", "no", "off"):
@@ -151,27 +143,30 @@ if USE_MRF_FILTERING:
     if RESERVOIR_NAME in reservoir_options:
         _log(f"[MRF Filtering] Requested for {RESERVOIR_NAME}")
 
-        mrf_ranges_path = _resolve_mrf_ranges_path(MRF_RANGES_JSON)
+        mrf_ranges_path = _resolve_mrf_filter_path(MRF_RANGES_JSON)
 
         if not mrf_ranges_path.exists():
             _log(f"[WARNING] MRF ranges JSON not found: {mrf_ranges_path}")
             _log("[WARNING] Continuing without MRF filtering.")
             USE_MRF_FILTERING = False
         else:
-            _log(f"[MRF Filtering] Loading MRF ranges from: {mrf_ranges_path}")
-            mrf_ranges_dict = load_mrf_ranges(str(mrf_ranges_path))
-
-            mode = "RES" if RESERVOIR_NAME in mrf_ranges_dict else "ANY"
-            if mode == "ANY":
-                _log("[MRF Filtering] Using ANY_lower_basin ranges (reservoir-specific not found)")
-
-            normal_ops_filter = build_normal_ops_filter(
-                datetime_index=datetime,
-                mrf_ranges_dict=mrf_ranges_dict,
-                reservoir_name=RESERVOIR_NAME,
-                mode=mode,
-                buffer_days=MRF_NORMAL_OPS_BUFFER_DAYS,
-            )
+            if mrf_ranges_path.suffix.lower() != ".csv":
+                _log(f"[ERROR] MRF filter must be CSV (got: {mrf_ranges_path})")
+                _log("[ERROR] Disabling MRF filtering.")
+                USE_MRF_FILTERING = False
+            else:
+                _log(f"[MRF Filtering] Loading MRF filter CSV: {mrf_ranges_path}")
+                daily_filter_df = load_mrf_daily_filter_csv(str(mrf_ranges_path))
+                mode = "RES" if RESERVOIR_NAME in daily_filter_df.columns else "ANY"
+                if mode == "ANY":
+                    _log("[MRF Filtering] Using ANY_lower_basin column (reservoir-specific not found)")
+                normal_ops_filter = build_normal_ops_filter_from_daily(
+                    datetime_index=datetime,
+                    daily_filter_df=daily_filter_df,
+                    reservoir_name=RESERVOIR_NAME,
+                    mode=mode,
+                    buffer_days=MRF_NORMAL_OPS_BUFFER_DAYS,
+                )
 
             is_valid, msg = validate_filter_alignment(
                 datetime_index=datetime,

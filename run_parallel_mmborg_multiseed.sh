@@ -2,8 +2,8 @@
 # --- Default: THREE sequential phase sweeps × multiseed loop (policy × reservoir × seeds) ---
 #   Same phases as run_parallel_mmborg.sh; each Borg invocation uses the loop seed (not 71/72).
 #   1) full        — USE_MRF=false → MMBorg_*_seed<S>.csv (no _mrffiltered_)
-#   2) regression  — USE_MRF=true, pub-reconstruction JSON → *_seed<S>_mrffiltered_regression.csv
-#   3) perfect     — USE_MRF=true, perfect-information JSON → *_seed<S>_mrffiltered_perfect.csv
+#   2) regression  — USE_MRF=true, regression_disagg JSON → *_seed<S>_mrffiltered_regression.csv
+#   3) perfect     — USE_MRF=true, perfect_foresight JSON → *_seed<S>_mrffiltered_perfect.csv
 #
 #   CEE_MULTISEED_FROM / CEE_MULTISEED_TO — inclusive seed range (default 1..10)
 #   CEE_BORG_MODES — comma-separated (default: full,regression,perfect)
@@ -30,8 +30,8 @@ export PYTHONPATH="${SCRIPT_DIR}:${PYTHONPATH:-}"
 echo "[paths] SCRIPT_DIR=${SCRIPT_DIR}  SLURM_SUBMIT_DIR=${SLURM_SUBMIT_DIR:-<unset>}"
 
 BORG_SCRIPT="${SCRIPT_DIR}/03_parallel_borg_run.py"
-_PUB_JSON="${SCRIPT_DIR}/preprocessing_outputs/filtering/pub_reconstruction/lower_basin_mrf_active_ranges.json"
-_PERF_JSON="${SCRIPT_DIR}/preprocessing_outputs/filtering/perfect_information/lower_basin_mrf_active_ranges.json"
+_PUB_JSON="${SCRIPT_DIR}/preprocessing_outputs/filtering/regression_disagg/mrf_active_filter_daily.csv"
+_PERF_JSON="${SCRIPT_DIR}/preprocessing_outputs/filtering/perfect_foresight/mrf_active_filter_daily.csv"
 
 module load python/3.11.5
 source /home/fs02/pmr82_0001/ms3654/envs/borg-env/bin/activate

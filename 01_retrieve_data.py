@@ -1,3 +1,14 @@
+"""
+Retrieve and aggregate observed reservoir data products.
+
+This script downloads raw USGS inflow/release/elevation series, converts elevation
+to storage, and writes reservoir-level processed CSVs used by `02_process_data.py`.
+
+Outputs:
+- `obs_data/raw/{inflow_raw,release_raw,elevation_raw,storage_raw}.csv`
+- `obs_data/processed/{inflow,release,storage}.csv`
+"""
+
 from methods.preprocessing.observed_data_retriever import ObservedDataRetriever
 from methods.plotting.plot_obs_dynamics import plot_obs_reservoir_dynamics
 import os

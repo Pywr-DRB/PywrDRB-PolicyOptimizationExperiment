@@ -1,3 +1,17 @@
+"""
+Build scaled inflow input for optimization.
+
+This script loads processed observed inflow/release/storage plus `inflow_pub`,
+then computes `inflow_scaled.csv` reservoir-by-reservoir by matching release volumes.
+Inflow source behavior is controlled by `--inflow-source`:
+- `pub_only` (default): always use `inflow_pub.csv`.
+- `observed_with_bluemarsh_pub`: use `inflow.csv` when available, but force `blueMarsh` from `inflow_pub.csv`.
+
+Output:
+- `obs_data/processed/inflow_scaled.csv`
+"""
+
+import argparse
 import pandas as pd
 
 from methods.load.observations import load_observations, get_overlapping_datetime_indices
@@ -6,6 +20,14 @@ from methods.load.observations import scale_inflow_observations
 from methods.config import DATA_DIR, reservoir_options, PROCESSED_DATA_DIR
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Build inflow_scaled.csv from observed and/or public inflow sources.")
+    parser.add_argument(
+        "--inflow-source",
+        choices=("pub_only", "observed_with_bluemarsh_pub"),
+        default="pub_only",
+        help="How to choose inflow source for each reservoir.",
+    )
+    args = parser.parse_args()
     
     ##############################################################
     ### Load data ################################################
@@ -38,16 +60,30 @@ if __name__ == "__main__":
 
     # apply scaling 1 at a time
     for reservoir in reservoir_options:
-        # Some reservoirs may not have complete observed inflow columns in inflow.csv.
-        # In that case, use inflow_pub for scaling against observed releases.
-        if reservoir in inflow_obs.columns:
-            inflow_source = inflow_obs.loc[:, [reservoir]]
-        elif reservoir in inflow_pub.columns:
-            print(f"[02_process_data] '{reservoir}' missing in inflow.csv; using inflow_pub fallback.")
-            inflow_source = inflow_pub.loc[:, [reservoir]]
+        if args.inflow_source == "pub_only":
+            if reservoir in inflow_pub.columns:
+                inflow_source = inflow_pub.loc[:, [reservoir]]
+            else:
+                print(f"[02_process_data] '{reservoir}' missing in inflow_pub.csv; skipping.")
+                continue
+        elif args.inflow_source == "observed_with_bluemarsh_pub":
+            if reservoir == "blueMarsh":
+                if reservoir in inflow_pub.columns:
+                    print("[02_process_data] forcing 'blueMarsh' from inflow_pub.csv.")
+                    inflow_source = inflow_pub.loc[:, [reservoir]]
+                else:
+                    print("[02_process_data] 'blueMarsh' missing in inflow_pub.csv; skipping.")
+                    continue
+            elif reservoir in inflow_obs.columns:
+                inflow_source = inflow_obs.loc[:, [reservoir]]
+            elif reservoir in inflow_pub.columns:
+                print(f"[02_process_data] '{reservoir}' missing in inflow.csv; using inflow_pub fallback.")
+                inflow_source = inflow_pub.loc[:, [reservoir]]
+            else:
+                print(f"[02_process_data] '{reservoir}' missing in both inflow and inflow_pub; skipping.")
+                continue
         else:
-            print(f"[02_process_data] '{reservoir}' missing in both inflow and inflow_pub; skipping.")
-            continue
+            raise ValueError(f"Unhandled --inflow-source mode: {args.inflow_source}")
         
         # Get overlapping datetime indices, for inflows and releases
         dt = get_overlapping_datetime_indices(inflow_source, 

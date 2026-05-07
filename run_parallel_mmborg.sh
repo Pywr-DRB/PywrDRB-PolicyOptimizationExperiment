@@ -1,8 +1,8 @@
 #!/bin/bash
 # Default behavior: run three sequential sweeps over the same policy x reservoir grid.
 #   1) full       -> USE_MRF=false, outputs MMBorg_*_seed72.csv (no _mrffiltered_)
-#   2) regression -> USE_MRF=true + pub-reconstruction JSON, outputs *_seed71_mrffiltered_regression.csv
-#   3) perfect    -> USE_MRF=true + perfect-information JSON, outputs *_seed71_mrffiltered_perfect.csv
+#   2) regression -> USE_MRF=true + regression_disagg JSON, outputs *_seed71_mrffiltered_regression.csv
+#   3) perfect    -> USE_MRF=true + perfect_foresight JSON, outputs *_seed71_mrffiltered_perfect.csv
 #
 # Main phase selector:
 #   CEE_BORG_MODES=full,regression,perfect
@@ -41,8 +41,8 @@ export PYTHONPATH="${SCRIPT_DIR}:${PYTHONPATH:-}"
 echo "[paths] SCRIPT_DIR=${SCRIPT_DIR}  SLURM_SUBMIT_DIR=${SLURM_SUBMIT_DIR:-<unset>}"
 
 BORG_SCRIPT="${SCRIPT_DIR}/03_parallel_borg_run.py"
-_PUB_JSON="${SCRIPT_DIR}/preprocessing_outputs/filtering/pub_reconstruction/lower_basin_mrf_active_ranges.json"
-_PERF_JSON="${SCRIPT_DIR}/preprocessing_outputs/filtering/perfect_information/lower_basin_mrf_active_ranges.json"
+_PUB_JSON="${SCRIPT_DIR}/preprocessing_outputs/filtering/regression_disagg/mrf_active_filter_daily.csv"
+_PERF_JSON="${SCRIPT_DIR}/preprocessing_outputs/filtering/perfect_foresight/mrf_active_filter_daily.csv"
 
 # -----------------------------------------------------------------------------
 # Environment/bootstrap: pin Python + BLAS/OpenMP threading for stable MPI runs.

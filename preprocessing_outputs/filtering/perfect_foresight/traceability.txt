@@ -1,0 +1,4 @@
+bundle=perfect_foresight
+inflow_type=pub_nhmv10_BC_withObsScaled
+flow_prediction_mode=perfect_foresight
+source_output_hdf5=/home/fs02/pmr82_0001/ms3654/Research/CEE6400Project/preprocessing_outputs/pywr/pywrdrb_output_pub_nhmv10_BC_withObsScaled_perfect_foresight.hdf5

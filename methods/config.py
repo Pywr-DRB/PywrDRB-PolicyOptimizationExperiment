@@ -54,12 +54,17 @@ def get_pywr_pick_hdf5_dir() -> str:
 
 # MRF filtering assets (see methods.preprocessing.build_mrf_active_filters and build_mrf_filtering_folder.sh)
 MRF_FILTERING_ROOT = os.path.join(_PROJECT_ROOT, "preprocessing_outputs", "filtering")
-MRF_FILTER_JSON_PUB_RECON = os.path.join(
-    MRF_FILTERING_ROOT, "pub_reconstruction", "lower_basin_mrf_active_ranges.json"
+MRF_FILTER_DAILY_REGRESSION_DISAGG = os.path.join(
+    MRF_FILTERING_ROOT, "regression_disagg", "mrf_active_filter_daily.csv"
 )
-MRF_FILTER_JSON_PERFECT_INFO = os.path.join(
-    MRF_FILTERING_ROOT, "perfect_information", "lower_basin_mrf_active_ranges.json"
+MRF_FILTER_DAILY_PERFECT_FORESIGHT = os.path.join(
+    MRF_FILTERING_ROOT, "perfect_foresight", "mrf_active_filter_daily.csv"
 )
+# Legacy aliases
+MRF_FILTER_JSON_REGRESSION_DISAGG = MRF_FILTER_DAILY_REGRESSION_DISAGG
+MRF_FILTER_JSON_PERFECT_FORESIGHT = MRF_FILTER_DAILY_PERFECT_FORESIGHT
+MRF_FILTER_JSON_PUB_RECON = MRF_FILTER_DAILY_REGRESSION_DISAGG
+MRF_FILTER_JSON_PERFECT_INFO = MRF_FILTER_DAILY_PERFECT_FORESIGHT
 
 # Buffer (days) around MRF “normal ops” windows for filtering (not in pywrdrb config)
 MRF_NORMAL_OPS_BUFFER_DAYS = 5

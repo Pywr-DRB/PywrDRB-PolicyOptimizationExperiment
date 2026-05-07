@@ -158,7 +158,7 @@ def mrf_filtered_file_suffix() -> str:
         src = os.environ.get("CEE_MRF_FILTER_SOURCE", "regression_disagg").strip().lower().replace("-", "_")
         if src in ("perfect", "perfect_information", "pi", "perfect_foresight"):
             tag = "perfect"
-        elif src in ("regression_disagg", "pub_reconstruction", "regression"):
+        elif src in ("regression_disagg", "regression"):
             tag = "regression_disagg"
         else:
             tag = "regression_disagg"

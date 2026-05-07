@@ -106,14 +106,15 @@ Top-level layout (folder-focused):
 - `obs_data/` - observational inputs (`raw`, `processed`, `pub_reconstruction`)
 - `outputs/` - Borg outputs and summary artifacts
 - `figures/` - generated figures
-- `pywr_data/` - Pywr run artifacts and caches
-- `preprocessing_outputs/` - generated filtering bundles and contribution diagnostics
+- `pywr_data/` - local-only Pywr JSON/HDF5 artifacts and caches for postprocessing/figure workflows (ignored by git)
+- `preprocessing_outputs/` - mode-specific filtering inputs for optimization + local preprocessing Pywr traces
 - `moeaframework/` - MOEA workflow scripts/helpers
 - `old/` - archived scripts kept for reference only
 
 Primary entrypoint scripts:
 
 - `run_preprocessing.sh`
+- `scripts/prepare_preprocessing_outputs.sh`
 - `build_mrf_filtering_folder.sh`
 - `run_parallel_mmborg.sh`
 - `run_parallel_mmborg_multiseed.sh`
@@ -136,6 +137,39 @@ Primary entrypoint scripts:
 sbatch run_preprocessing.sh
 ```
 
+`run_preprocessing.sh` runs `02_process_data.py` with inflow mode `pub_only` by default.
+Default behavior (recommended) is public inflow for all reservoirs:
+
+```bash
+sbatch run_preprocessing.sh
+```
+
+Other valid values:
+- `pub_only`
+- `observed_with_bluemarsh_pub` (use observed where available, but always force `blueMarsh` from `inflow_pub`)
+
+Preprocessing inflow source settings (via `CEE_INFLOW_SOURCE_MODE`):
+
+```bash
+# Default/recommended: use inflow_pub for all reservoirs
+CEE_INFLOW_SOURCE_MODE=pub_only sbatch run_preprocessing.sh
+
+# Mixed mode: observed where available, but force blueMarsh from inflow_pub
+CEE_INFLOW_SOURCE_MODE=observed_with_bluemarsh_pub sbatch run_preprocessing.sh
+```
+
+Reproducible local helper (runs only when missing, unless forced):
+
+```bash
+bash scripts/prepare_preprocessing_outputs.sh
+```
+
+Force full regeneration of both MRF modes:
+
+```bash
+FORCE_MRF_FILTER_BUILD=1 bash scripts/prepare_preprocessing_outputs.sh
+```
+
 ### 2) Build MRF filtering bundles
 
 ```bash
@@ -144,8 +178,22 @@ bash build_mrf_filtering_folder.sh
 
 This creates filtering assets under:
 
-- `preprocessing_outputs/filtering/pub_reconstruction/`
-- `preprocessing_outputs/filtering/perfect_information/`
+- `preprocessing_outputs/filtering/regression_disagg/`
+- `preprocessing_outputs/filtering/perfect_foresight/`
+
+Each bundle includes:
+
+- `lower_basin_mrf_contributions.csv` (tracked)
+- `mrf_active_filter_daily.csv` (tracked)
+
+### Preprocessing output contract (for reproducibility + clean pushes)
+
+- Commit: CSV/PNG outputs needed by downstream scripts and figures.
+- Do not commit: generated model `.json`/`.hdf5` artifacts.
+- Local-only MRF preprocessing model artifacts are written under `preprocessing_outputs/pywr/`.
+- `pywr_data/` is still used by postprocessing/figure pipelines and full-Pareto simulation workflows.
+- Filtering outputs live only under `preprocessing_outputs/filtering/{regression_disagg,perfect_foresight}/`.
+- If legacy folders like `preprocessing_outputs/contributions/` appear in local clones, treat them as archival and remove them.
 
 ### 3) Run mmBorg optimization
 

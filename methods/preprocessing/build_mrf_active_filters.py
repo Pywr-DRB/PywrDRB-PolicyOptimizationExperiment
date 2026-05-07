@@ -4,17 +4,18 @@ build_mrf_active_filters.py
 
 Preprocessing script to:
 1. Run PywrDRB simulation with default policy (unless --skip-simulation + --existing-output)
-2. Extract lower_basin_mrf_contributions DataFrame from the HDF5
-3. Export to CSV
-4. Build MRF active date ranges JSON for filtering optimization objectives
+2. Extract lower_basin_mrf_contributions from HDF5 using pywrdrb.Data loader
+3. Export contributions and daily filter CSV
+4. Optionally export compact MRF date-range JSON (not required by optimization)
 
 `build_mrf_filtering_folder.sh` uses existing pub HDF5 when present (else runs Pywr); the
-perfect_information bundle is always read from HDF5 only (never simulated there).
+mode bundles are organized by optimization flow mode:
+- regression_disagg
+- perfect_foresight
 
 Usage:
     python -m methods.preprocessing.build_mrf_active_filters \
         --output-csv lower_basin_mrf_contributions.csv \
-        --output-json lower_basin_mrf_active_ranges.json \
         --epsilon 0.1 \
         --csv-output mrf_active_filter_daily.csv
 """
@@ -51,6 +52,7 @@ from methods.preprocessing.mrf_filtering import build_lower_basin_mrf_active_dic
 
 def run_pywrdrb_simulation(
     inflow_type: str = "pub_nhmv10_BC_withObsScaled",
+    flow_prediction_mode: str = "regression_disagg",
     start_date: str = "1983-10-01",
     end_date: str = "2023-12-31",
     work_dir: Path | None = None,
@@ -64,6 +66,7 @@ def run_pywrdrb_simulation(
     work_dir.mkdir(parents=True, exist_ok=True)
 
     print(f"\nRunning PywrDRB simulation for inflow type: {inflow_type}")
+    print(f"  Flow prediction mode: {flow_prediction_mode}")
     print(f"  Start date: {start_date}")
     print(f"  End date: {end_date}")
     print(f"  Work directory: {work_dir}")
@@ -72,11 +75,12 @@ def run_pywrdrb_simulation(
         inflow_type=inflow_type,
         start_date=start_date,
         end_date=end_date,
+        options={"flow_prediction_mode": flow_prediction_mode},
     )
     mb.make_model()
 
-    model_filename = str(work_dir / f"model_{inflow_type}.json")
-    output_filename = str(work_dir / f"pywrdrb_output_{inflow_type}.hdf5")
+    model_filename = str(work_dir / f"model_{inflow_type}_{flow_prediction_mode}.json")
+    output_filename = str(work_dir / f"pywrdrb_output_{inflow_type}_{flow_prediction_mode}.hdf5")
 
     mb.write_model(model_filename)
 
@@ -120,6 +124,12 @@ def extract_mrf_contributions(
 def main() -> None:
     parser = argparse.ArgumentParser(description="Build MRF active filters from PywrDRB simulation")
     parser.add_argument("--inflow-type", default="pub_nhmv10_BC_withObsScaled", help="Inflow type for PywrDRB simulation")
+    parser.add_argument(
+        "--flow-prediction-mode",
+        choices=("regression_disagg", "perfect_foresight", "gage_flow"),
+        default="regression_disagg",
+        help="Pywr-DRB flow prediction mode used by ModelBuilder when simulation is run.",
+    )
     parser.add_argument("--start-date", default="1983-10-01", help="Simulation start date (YYYY-MM-DD)")
     parser.add_argument("--end-date", default="2023-12-31", help="Simulation end date (YYYY-MM-DD)")
     parser.add_argument(
@@ -129,7 +139,7 @@ def main() -> None:
         help="Directory for model_*.json and pywrdrb_output_*.hdf5 when running Pywr. Default: <project>/pywr_data/_mrf_pub_sim.",
     )
     parser.add_argument("--output-csv", type=Path, default="lower_basin_mrf_contributions.csv", help="Output CSV path for MRF contributions DataFrame")
-    parser.add_argument("--output-json", type=Path, default="lower_basin_mrf_active_ranges.json", help="Output JSON path for MRF active date ranges")
+    parser.add_argument("--output-json", type=Path, default=None, help="Optional output JSON path for MRF active date ranges (not required by optimization).")
     parser.add_argument("--epsilon", type=float, default=0.1, help="Threshold (MGD) for considering MRF contribution 'active'")
     parser.add_argument("--csv-output", type=Path, default=None, help="Optional: also export daily filter CSV for debugging")
     parser.add_argument("--skip-simulation", action="store_true", help="Skip simulation and use existing output file (must provide --existing-output)")
@@ -139,7 +149,7 @@ def main() -> None:
     parser.add_argument("--plot-end", default=None, help="Optional: end date for plot window (YYYY-MM-DD)")
     parser.add_argument(
         "--filter-bundle",
-        choices=("pub_reconstruction", "perfect_information"),
+        choices=("regression_disagg", "perfect_foresight"),
         default=None,
         help="Write standard filenames under preprocessing_outputs/filtering/<bundle>/",
     )
@@ -152,9 +162,10 @@ def main() -> None:
         bundle_dir = PROJECT_ROOT / "preprocessing_outputs" / "filtering" / args.filter_bundle
         bundle_dir.mkdir(parents=True, exist_ok=True)
         args.output_csv = bundle_dir / "lower_basin_mrf_contributions.csv"
-        args.output_json = bundle_dir / "lower_basin_mrf_active_ranges.json"
         if args.csv_output is None:
             args.csv_output = bundle_dir / "mrf_active_filter_daily.csv"
+        if args.plot_output is None:
+            args.plot_output = bundle_dir / f"mrf_contributions_{args.filter_bundle}.png"
 
     if args.skip_simulation:
         if args.existing_output is None:
@@ -164,6 +175,7 @@ def main() -> None:
     else:
         _, output_filename = run_pywrdrb_simulation(
             inflow_type=args.inflow_type,
+            flow_prediction_mode=args.flow_prediction_mode,
             start_date=args.start_date,
             end_date=args.end_date,
             work_dir=args.work_dir,
@@ -176,7 +188,7 @@ def main() -> None:
     df_mrf.to_csv(output_csv)
     print(f"\n✓ Exported MRF contributions to: {output_csv}")
 
-    print(f"\nBuilding MRF active date ranges (epsilon={args.epsilon})")
+    print(f"\nBuilding MRF active filters (epsilon={args.epsilon})")
     reservoirs = ["beltzvilleCombined", "blueMarsh", "nockamixon"]
     prefix = "mrf_trenton_"
 
@@ -197,15 +209,32 @@ def main() -> None:
         prefix=prefix,
     )
 
-    output_json = Path(args.output_json)
-    output_json.parent.mkdir(parents=True, exist_ok=True)
-    json_dict = {
-        key: [{"start": str(r["start"]), "end": str(r["end"]), "days": r["days"]} for r in ranges]
-        for key, ranges in mrf_ranges_dict.items()
-    }
-    with open(output_json, "w") as f:
-        json.dump(json_dict, f, indent=2)
-    print(f"✓ Exported MRF active ranges to: {output_json}")
+    if args.output_json:
+        output_json = Path(args.output_json)
+        output_json.parent.mkdir(parents=True, exist_ok=True)
+        json_dict = {
+            key: [{"start": str(r["start"]), "end": str(r["end"]), "days": r["days"]} for r in ranges]
+            for key, ranges in mrf_ranges_dict.items()
+        }
+        with open(output_json, "w") as f:
+            json.dump(json_dict, f, indent=2)
+        print(f"✓ Exported MRF active ranges to: {output_json}")
+
+    if args.filter_bundle:
+        trace_path = bundle_dir / "traceability.txt"
+        trace_path.write_text(
+            "\n".join(
+                [
+                    f"bundle={args.filter_bundle}",
+                    f"inflow_type={args.inflow_type}",
+                    f"flow_prediction_mode={args.flow_prediction_mode}",
+                    f"source_output_hdf5={output_filename}",
+                ]
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+        print(f"✓ Wrote traceability metadata: {trace_path}")
 
     if args.csv_output:
         filter_df = pd.DataFrame(index=df_mrf.index)

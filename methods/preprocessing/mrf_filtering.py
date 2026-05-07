@@ -86,6 +86,45 @@ def load_mrf_ranges(json_path: str | Path) -> Dict:
     return result
 
 
+def load_mrf_daily_filter_csv(csv_path: str | Path) -> pd.DataFrame:
+    """Load daily MRF-active filter CSV (0/1 columns) indexed by datetime."""
+    df = pd.read_csv(csv_path, index_col=0, parse_dates=True)
+    if not isinstance(df.index, pd.DatetimeIndex):
+        df.index = pd.to_datetime(df.index)
+    return df
+
+
+def build_normal_ops_filter_from_daily(
+    datetime_index: pd.DatetimeIndex,
+    daily_filter_df: pd.DataFrame,
+    reservoir_name: str | None = None,
+    mode: str = "ANY",
+    buffer_days: int = 0,
+) -> np.ndarray:
+    """Create normal-ops filter from daily MRF-active 0/1 CSV using range-buffer logic."""
+    if mode == "ANY":
+        key = "ANY_lower_basin"
+    elif mode == "RES":
+        if reservoir_name is None:
+            raise ValueError("reservoir_name required when mode='RES'")
+        key = reservoir_name
+    else:
+        raise ValueError(f"Invalid mode: {mode}. Must be 'ANY' or 'RES'")
+
+    if key not in daily_filter_df.columns:
+        raise KeyError(f"Column '{key}' not found in daily filter CSV. Available: {list(daily_filter_df.columns)}")
+
+    active = daily_filter_df[key].astype(float).reindex(datetime_index).fillna(0.0).astype(int).astype(bool)
+    mrf_ranges_dict = {key: filter_to_ranges(active)}
+    return build_normal_ops_filter(
+        datetime_index=datetime_index,
+        mrf_ranges_dict=mrf_ranges_dict,
+        reservoir_name=(reservoir_name if mode == "RES" else None),
+        mode=mode,
+        buffer_days=buffer_days,
+    )
+
+
 def build_normal_ops_filter(
     datetime_index: pd.DatetimeIndex,
     mrf_ranges_dict: Dict,
