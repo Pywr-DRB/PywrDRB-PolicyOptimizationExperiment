@@ -8,7 +8,7 @@ This folder is organized by **optimization filtering mode** so downstream script
   - `lower_basin_mrf_contributions.csv` — raw daily lower-basin MRF contributions extracted from Pywr output.
   - `mrf_active_filter_daily.csv` — binary daily filter (0/1) derived from contributions with `epsilon`.
   - `mrf_contributions_regression_disagg.png` — diagnostic stacked-area plot of contributions.
-  - `traceability.txt` — inflow type, flow mode, and source HDF5 used to build this bundle.
+  - `traceability.txt` — inflow type, flow mode, and source HDF5 path used for extraction/build.
 
 - `filtering/perfect_foresight/`
   - same file roles as above, for perfect-foresight flow prediction mode.
@@ -36,4 +36,5 @@ From project root:
 
 ```bash
 bash scripts/prepare_preprocessing_outputs.sh
+FORCE_MRF_FILTER_BUILD=1 bash scripts/prepare_preprocessing_outputs.sh
 ```

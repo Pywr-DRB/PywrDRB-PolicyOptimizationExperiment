@@ -49,6 +49,7 @@ moeaframework/figures_moea_metrics/
 interactive/
 figures/
 pywr_data/
+pywrdata/
 
 # Out-of-scope workflows for current STARFIT parametric merge target
 methods/analysis/run_operational_burden_figures.py

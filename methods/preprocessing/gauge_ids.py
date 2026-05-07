@@ -1,5 +1,5 @@
 # Define gauges and mappings
-from methods.config import PROCESSED_DATA_DIR, RAW_DATA_DIR, FIG_DIR
+from methods.config import RAW_DATA_DIR
 
 inflow_gauges = {
     "prompton": ["01428750"],
@@ -23,8 +23,8 @@ release_gauges = {
 }
 
 storage_curves = {
-    "01449790": f"{RAW_DATA_DIR}/beltzvilleCombined_storage_curve.csv", #"beltzvilleCombined"
-    "01447780": f"{RAW_DATA_DIR}/fewalter_storage_curve.csv", #fewalter
-    "01428900": f"{RAW_DATA_DIR}/prompton_storage_curve.csv", #prompton
-    "01470870": f"{RAW_DATA_DIR}/blueMarsh_storage_curve.csv" #blueMarsh
+    "01449790": f"{RAW_DATA_DIR}/beltzvilleCombined_storage_curve.csv",  # "beltzvilleCombined"
+    "01447780": f"{RAW_DATA_DIR}/fewalter_storage_curve.csv",  # fewalter
+    "01428900": f"{RAW_DATA_DIR}/prompton_storage_curve.csv",  # prompton
+    "01470870": f"{RAW_DATA_DIR}/blueMarsh_storage_curve.csv",  # blueMarsh
 }

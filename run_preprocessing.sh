@@ -1,5 +1,4 @@
 #!/bin/bash
-set -euo pipefail
 
 #SBATCH --job-name=PreprocessObs
 #SBATCH --output=logs/preprocess.out
@@ -9,10 +8,16 @@ set -euo pipefail
 #SBATCH --mail-type=END
 #SBATCH --mail-user=ms3654@cornell.edu
 
-# Run from project root so Python finds the methods package
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+set -euo pipefail
+
+# Run from submit directory on Slurm (or script dir locally) so paths resolve from repo root.
+if [[ -n "${SLURM_SUBMIT_DIR:-}" ]]; then
+  SCRIPT_DIR="${SLURM_SUBMIT_DIR}"
+else
+  SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+fi
 cd "$SCRIPT_DIR"
-export PYTHONPATH="${SCRIPT_DIR}:${PYTHONPATH}"
+export PYTHONPATH="${SCRIPT_DIR}:${PYTHONPATH:-}"
 
 # Load Python module
 module load python/3.11.5

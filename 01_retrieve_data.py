@@ -17,7 +17,7 @@ import pandas as pd
 # Directories
 from methods.config import PROCESSED_DATA_DIR, RAW_DATA_DIR, FIG_DIR
 
-from gauge_ids import inflow_gauges, release_gauges, storage_gauges, storage_curves
+from methods.preprocessing.gauge_ids import inflow_gauges, release_gauges, storage_gauges, storage_curves
 
 # Flatten gauges
 def flatten_gauges(gauge_dict):

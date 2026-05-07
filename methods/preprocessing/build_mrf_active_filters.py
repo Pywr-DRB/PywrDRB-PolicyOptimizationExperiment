@@ -228,7 +228,7 @@ def main() -> None:
                     f"bundle={args.filter_bundle}",
                     f"inflow_type={args.inflow_type}",
                     f"flow_prediction_mode={args.flow_prediction_mode}",
-                    f"source_output_hdf5={output_filename}",
+                    f"source_hdf5_path_used_for_extraction_build={output_filename}",
                 ]
             )
             + "\n",
