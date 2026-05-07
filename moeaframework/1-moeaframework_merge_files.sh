@@ -43,8 +43,8 @@ for policy_dir in "${OUT_ROOT}"/Policy_*; do
     for runtime in "$rdir"/*.runtime; do
       base="$(basename "$runtime" .runtime)"            # strip .runtime
       # Expect filenames like ..._seed<seed>_<island>.runtime
-      # Optional _mrfmasked[_pub|_perfect] before _<island> (masked Borg objectives)
-      if [[ "$base" =~ _seed([0-9]+)(_mrfmasked(_pub|_perfect)?)?_([0-9]+)$ ]]; then
+      # Optional _mrffiltered[_pub|_perfect] before _<island> (filtered Borg objectives)
+      if [[ "$base" =~ _seed([0-9]+)(_mrffiltered(_pub|_perfect)?)?_([0-9]+)$ ]]; then
         seed="${BASH_REMATCH[1]}"                       # captured <seed>
         island="${BASH_REMATCH[4]}"                     # captured <island>
         (( seed < SEED_FROM || seed > SEED_TO )) && continue  # filter seeds not in window

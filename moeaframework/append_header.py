@@ -63,9 +63,6 @@ def main():
                         str(rdir / f"*_*_seed{seed}_{master}.set"),
                         str(rdir / f"*_*_seed{seed}_mrffiltered_regression_{master}.set"),
                         str(rdir / f"*_*_seed{seed}_mrffiltered_perfect_{master}.set"),
-                        str(rdir / f"*_*_seed{seed}_mrfmasked_{master}.set"),
-                        str(rdir / f"*_*_seed{seed}_mrfmasked_perfect_{master}.set"),
-                        str(rdir / f"*_*_seed{seed}_mrfmasked_regression_{master}.set"),
                     ]
                     matched = []
                     for pattern in patterns:

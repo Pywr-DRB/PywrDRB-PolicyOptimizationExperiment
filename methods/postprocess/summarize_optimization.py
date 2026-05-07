@@ -4,10 +4,10 @@ Summarize Borg optimization outputs: objectives used, total solution counts,
 and per-reservoir/per-policy counts before and after OBJ_FILTER_BOUNDS filtering.
 
 Respects the same environment as figures (methods.borg_paths.resolve_borg_moea_csv_path):
-  CEE_BORG_SEED / CEE_SEED, CEE_BORG_MRF_FILTERED (or deprecated CEE_BORG_MRFMASKED),
-  CEE_MRF_FILTER_TAG / CEE_MRF_FILTER_SOURCE (or deprecated CEE_MRF_MASK_*).
+  CEE_BORG_SEED / CEE_SEED, CEE_BORG_MRF_FILTERED,
+  CEE_MRF_FILTER_TAG / CEE_MRF_FILTER_SOURCE.
   On-disk Borg CSVs use ``*_mrffiltered_regression.csv`` / ``*_mrffiltered_perfect.csv``; ``CEE_MRF_FILTER_TAG`` may be
-  user-facing names such as ``regression_disagg`` or ``perfect`` (see ``methods.borg_paths``). Legacy ``*_mrfmasked_*`` is still found.
+  user-facing names such as ``regression_disagg`` or ``perfect`` (see ``methods.borg_paths``).
 
 Usage (from CEE6400Project/):
   CEE_BORG_SEED=72 CEE_BORG_MRF_FILTERED=0 python -m methods.postprocess.summarize_optimization
@@ -77,11 +77,8 @@ def main() -> None:
             "CEE_BORG_SEED": os.environ.get("CEE_BORG_SEED", ""),
             "CEE_SEED": os.environ.get("CEE_SEED", ""),
             "CEE_BORG_MRF_FILTERED": os.environ.get("CEE_BORG_MRF_FILTERED", ""),
-            "CEE_BORG_MRFMASKED": os.environ.get("CEE_BORG_MRFMASKED", ""),
             "CEE_MRF_FILTER_TAG": os.environ.get("CEE_MRF_FILTER_TAG", ""),
             "CEE_MRF_FILTER_SOURCE": os.environ.get("CEE_MRF_FILTER_SOURCE", ""),
-            "CEE_MRF_MASK_TAG": os.environ.get("CEE_MRF_MASK_TAG", ""),
-            "CEE_MRF_MASK_SOURCE": os.environ.get("CEE_MRF_MASK_SOURCE", ""),
         },
     }
 

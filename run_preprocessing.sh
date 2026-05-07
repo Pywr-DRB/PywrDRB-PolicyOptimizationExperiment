@@ -1,4 +1,6 @@
 #!/bin/bash
+set -euo pipefail
+
 #SBATCH --job-name=PreprocessObs
 #SBATCH --output=logs/preprocess.out
 #SBATCH --error=logs/preprocess.err

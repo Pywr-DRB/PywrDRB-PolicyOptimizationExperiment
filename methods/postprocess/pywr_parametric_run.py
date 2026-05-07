@@ -51,12 +51,8 @@ def resolve_parametric_run_bundle_tag() -> str:
         or os.environ.get("CEE_SEED", "").strip()
         or "no_seed"
     )
-    mrf = os.environ.get("CEE_BORG_MRF_FILTERED", "").strip() or os.environ.get(
-        "CEE_BORG_MRFMASKED", ""
-    ).strip()
-    tag = os.environ.get("CEE_MRF_FILTER_TAG", "").strip() or os.environ.get(
-        "CEE_MRF_MASK_TAG", ""
-    ).strip()
+    mrf = os.environ.get("CEE_BORG_MRF_FILTERED", "").strip()
+    tag = os.environ.get("CEE_MRF_FILTER_TAG", "").strip()
     parts = [safe_name(fig_sub), f"seed{safe_name(seed)}"]
     if mrf:
         parts.append(f"mrf{safe_name(mrf)}")

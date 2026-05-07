@@ -65,7 +65,7 @@ def _positive_log_limits(series_list, lo: float = 0.2, hi: float = 99.8, pad: fl
     return (ql, qh + pad * span)
 
 
-def _mask_nonpositive(s: Optional[pd.Series]) -> Optional[pd.Series]:
+def _filter_nonpositive(s: Optional[pd.Series]) -> Optional[pd.Series]:
     if s is None:
         return None
     out = s.astype(float).copy()
@@ -204,11 +204,11 @@ def plot_2x1_dynamics(
             nor_lo_a.loc[bad] = nor_hi_a.loc[bad]
             nor_hi_a.loc[bad] = lo_fix.loc[bad]
 
-    # log-aware prep (mask <=0, compute limits in the right space)
+    # log-aware prep (filter <=0, compute limits in the right space)
     if yscale_release == "log":
         ylims_release = ylims_release or _positive_log_limits([R1, R2, R3, Robs])
-        R1p, R2p = _mask_nonpositive(R1), _mask_nonpositive(R2)
-        R3p, Robsp = _mask_nonpositive(R3), _mask_nonpositive(Robs)
+        R1p, R2p = _filter_nonpositive(R1), _filter_nonpositive(R2)
+        R3p, Robsp = _filter_nonpositive(R3), _filter_nonpositive(Robs)
     else:
         R1p, R2p, R3p, Robsp = R1, R2, R3, Robs
         if ylims_release is None:
@@ -216,8 +216,8 @@ def plot_2x1_dynamics(
 
     if yscale_storage == "log":
         ylims_storage = ylims_storage or _positive_log_limits([S1, S2, S3, Sobs])
-        S1p, S2p = _mask_nonpositive(S1), _mask_nonpositive(S2)
-        S3p, Sobsp = _mask_nonpositive(S3), _mask_nonpositive(Sobs)
+        S1p, S2p = _filter_nonpositive(S1), _filter_nonpositive(S2)
+        S3p, Sobsp = _filter_nonpositive(S3), _filter_nonpositive(Sobs)
     else:
         S1p, S2p, S3p, Sobsp = S1, S2, S3, Sobs
         if ylims_storage is None:

@@ -78,9 +78,9 @@ for s in $(seq "$SEED_FROM" "$SEED_TO"); do
         runfiles+=( "$rdir"/*_seed${s}_${master}.runtime )
         runfiles+=( "$rdir"/*_seed${s}_mrffiltered_regression_${master}.runtime )
         runfiles+=( "$rdir"/*_seed${s}_mrffiltered_perfect_${master}.runtime )
-        runfiles+=( "$rdir"/*_seed${s}_mrfmasked_${master}.runtime )
-        runfiles+=( "$rdir"/*_seed${s}_mrfmasked_perfect_${master}.runtime )
-        runfiles+=( "$rdir"/*_seed${s}_mrfmasked_regression_${master}.runtime )
+        runfiles+=( "$rdir"/*_seed${s}_mrffiltered_${master}.runtime )
+        runfiles+=( "$rdir"/*_seed${s}_mrffiltered_perfect_${master}.runtime )
+        runfiles+=( "$rdir"/*_seed${s}_mrffiltered_regression_${master}.runtime )
         [[ ${#runfiles[@]} -gt 0 ]] || { echo "     (no runtimes for seed ${s}, master ${master})"; continue; }
 
         for infile in "${runfiles[@]}"; do

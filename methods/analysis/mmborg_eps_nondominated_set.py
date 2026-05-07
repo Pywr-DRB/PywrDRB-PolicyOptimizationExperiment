@@ -79,9 +79,9 @@ Per-reservoir file with ``moea_policy`` (``load_results`` drops extra columns; k
     policies = ["STARFIT", "PWL", "RBF"]
     obj_dfs, labels = [], []
     for p in policies:
-        mask = meta["moea_policy"].astype(str).str.upper() == p
-        if mask.any():
-            obj_dfs.append(obj_df.loc[mask].copy())
+        filter = meta["moea_policy"].astype(str).str.upper() == p
+        if filter.any():
+            obj_dfs.append(obj_df.loc[filter].copy())
             labels.append(p)
     plot_pareto_front_comparison(
         obj_dfs,

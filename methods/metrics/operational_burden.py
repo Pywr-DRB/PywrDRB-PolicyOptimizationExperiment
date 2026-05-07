@@ -25,16 +25,16 @@ import pandas as pd
 # ---------------------------------------------------------------------------
 
 
-def find_spells(mask: pd.Series, min_duration: int = 1) -> pd.DataFrame:
+def find_spells(filter: pd.Series, min_duration: int = 1) -> pd.DataFrame:
     """
-    Contiguous True segments along a boolean mask (daily index).
+    Contiguous True segments along a boolean filter (daily index).
 
     Returns
     -------
     pd.DataFrame
         Columns: start, end, duration_days
     """
-    m = mask.astype(bool).reindex(mask.index).fillna(False)
+    m = filter.astype(bool).reindex(filter.index).fillna(False)
     if m.empty:
         return pd.DataFrame(columns=["start", "end", "duration_days"])
 
@@ -51,11 +51,11 @@ def find_spells(mask: pd.Series, min_duration: int = 1) -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
-def spell_summary(mask: pd.Series, min_duration: int = 1) -> dict:
-    """Scalar summaries for a boolean stress / deficit mask."""
-    spells = find_spells(mask, min_duration=min_duration)
-    n = len(mask)
-    frac = float(mask.astype(float).mean()) if n else 0.0
+def spell_summary(filter: pd.Series, min_duration: int = 1) -> dict:
+    """Scalar summaries for a boolean stress / deficit filter."""
+    spells = find_spells(filter, min_duration=min_duration)
+    n = len(filter)
+    frac = float(filter.astype(float).mean()) if n else 0.0
     mean_dur = float(spells["duration_days"].mean()) if len(spells) else 0.0
     max_dur = int(spells["duration_days"].max()) if len(spells) else 0
     return {
@@ -72,7 +72,7 @@ def spell_summary(mask: pd.Series, min_duration: int = 1) -> dict:
 # ---------------------------------------------------------------------------
 
 
-def nor_mask(
+def nor_filter(
     storage_pct: pd.Series,
     nor_low_pct: float,
     nor_high_pct: float,
@@ -91,11 +91,11 @@ def nor_operational_burden_metrics(
     min_spell_duration: int = 1,
 ) -> dict:
     """
-    Time *outside* NOR and spell statistics for the complementary mask.
+    Time *outside* NOR and spell statistics for the complementary filter.
 
     Drought-side stress is often ``storage < nor_low``; flood-side ``storage > nor_high``.
     """
-    inside = nor_mask(storage_pct, nor_low_pct, nor_high_pct)
+    inside = nor_filter(storage_pct, nor_low_pct, nor_high_pct)
     below = storage_pct.astype(float) < nor_low_pct
     above = storage_pct.astype(float) > nor_high_pct
     outside = ~inside
@@ -292,8 +292,8 @@ def trenton_target_metrics(
 
     return {
         "shortfall": shortfall.rename("shortfall"),
-        "binding_mask": binding.rename("binding"),
-        "surplus_mask": surplus.rename("surplus"),
+        "binding_filter": binding.rename("binding"),
+        "surplus_filter": surplus.rename("surplus"),
         "shortfall_spell_summary": spell_summary(shortfall > shortfall_epsilon),
         "binding_spell_summary": spell_summary(binding),
         "mean_shortfall_when_binding": float(shortfall[binding].mean()) if binding.any() else 0.0,
@@ -337,7 +337,7 @@ def contribution_vs_depletion_tradeoff(
     Build a per-reservoir table: operational contribution vs drought stress exposure.
 
     If ``storage_pct_by_reservoir`` is provided, stress days use that column.
-    Otherwise all reservoirs get the same ``combined_storage_pct`` stress mask
+    Otherwise all reservoirs get the same ``combined_storage_pct`` stress filter
     (useful for NYC combined pool vs lower-basin contributions).
     """
     shares = contribution_shares(

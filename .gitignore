@@ -35,7 +35,9 @@ moeaframework/logs/*
 data_test/
 outputs/
 data/postprocess_runs/
-preprocessing_outputs/
+# preprocessing_outputs: do not track large binary + derived filter JSON
+preprocessing_outputs/pywr/*.hdf5
+preprocessing_outputs/filtering/*/lower_basin_mrf_active_ranges.json
 # Ignore example files
 example_nsga copy.py
 # Ignore specific figure files

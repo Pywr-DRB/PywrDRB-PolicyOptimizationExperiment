@@ -8,7 +8,7 @@ from .operational_burden import (
     contribution_shares,
     contribution_vs_depletion_tradeoff,
     find_spells,
-    nor_mask,
+    nor_filter,
     nor_operational_burden_metrics,
     recovery_times_after_spells,
     rolling_covariance,

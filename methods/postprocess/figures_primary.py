@@ -1100,7 +1100,6 @@ def main_stage1():
         print(
             "[paths] Borg CSVs: CEE_BORG_OUTPUT_DIR (default: outputs/), CEE_BORG_SEED or CEE_SEED, "
             f"CEE_BORG_MRF_FILTERED={os.environ.get('CEE_BORG_MRF_FILTERED', '')!r} "
-            f"(deprecated alias CEE_BORG_MRFMASKED={os.environ.get('CEE_BORG_MRFMASKED', '')!r}); "
             f"CEE_MRF_FILTER_TAG={os.environ.get('CEE_MRF_FILTER_TAG', '')!r}"
         )
         print(

@@ -93,8 +93,8 @@ def custom_parallel_coordinates(
 
     # --- quick visibility sanity check for Baseline row ---
     if color_by_categorical is not None and "Baseline" in set(objs[color_by_categorical].astype(str)):
-        bl_mask = objs[color_by_categorical].astype(str) == "Baseline"
-        missing_axes = [c for c in columns_axes if not np.isfinite(pd.to_numeric(objs.loc[bl_mask, c], errors="coerce")).all()]
+        bl_filter = objs[color_by_categorical].astype(str) == "Baseline"
+        missing_axes = [c for c in columns_axes if not np.isfinite(pd.to_numeric(objs.loc[bl_filter, c], errors="coerce")).all()]
         if missing_axes:
             print(f"[WARN] Baseline has missing values on: {', '.join(missing_axes)} (will render at mid-axis for those).")
 

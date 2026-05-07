@@ -350,10 +350,10 @@ def plot_flow_regime_performance_split(
             tr = run["trenton"]
             m = min(len(tr), len(regime))
             for g in (0, 1, 2):
-                mask = regime[:m] == g
-                if not np.any(mask):
+                filter = regime[:m] == g
+                if not np.any(filter):
                     continue
-                rel = float(np.mean(tr[:m][mask] >= ctx.target_mgd))
+                rel = float(np.mean(tr[:m][filter] >= ctx.target_mgd))
                 buckets[run["policy"]][g].append(rel)
 
         row_axes = axes[row]

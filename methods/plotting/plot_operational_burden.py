@@ -377,7 +377,7 @@ def plot_annual_stress_bars(
 
 def plot_storage_ecdf_stress_split(
     storage_pct: pd.Series,
-    stress_mask: pd.Series,
+    stress_filter: pd.Series,
     *,
     ax: Optional[plt.Axes] = None,
     label_stress: str = "Stress days",
@@ -391,8 +391,8 @@ def plot_storage_ecdf_stress_split(
     if created:
         _, ax = plt.subplots(figsize=(5.0, 4.0), dpi=140)
 
-    s = storage_pct.astype(float).reindex(stress_mask.index).dropna()
-    m = stress_mask.reindex(s.index).fillna(False).astype(bool)
+    s = storage_pct.astype(float).reindex(stress_filter.index).dropna()
+    m = stress_filter.reindex(s.index).fillna(False).astype(bool)
 
     def ecdf(a: np.ndarray):
         a = np.sort(a[np.isfinite(a)])
@@ -401,8 +401,8 @@ def plot_storage_ecdf_stress_split(
         y = np.arange(1, len(a) + 1) / len(a)
         return a, y
 
-    for mask, lab, c in [(m, label_stress, "#d62828"), (~m, label_other, "#2a9d8f")]:
-        xs, ys = ecdf(s.loc[mask].values)
+    for filter, lab, c in [(m, label_stress, "#d62828"), (~m, label_other, "#2a9d8f")]:
+        xs, ys = ecdf(s.loc[filter].values)
         if len(xs):
             ax.plot(xs, ys, lw=2.0, label=lab, color=c)
 
@@ -508,11 +508,11 @@ def plot_operational_burden_summary_figure(
     ax_an = fig.add_subplot(gs[1, 1])
     plot_annual_stress_bars(annual_stress, ax=ax_an)
 
-    stress_mask = storage_pct.astype(float) < stress_threshold_pct
+    stress_filter = storage_pct.astype(float) < stress_threshold_pct
     ax_ec = fig.add_subplot(gs[2, 0])
     plot_storage_ecdf_stress_split(
         storage_pct,
-        stress_mask,
+        stress_filter,
         ax=ax_ec,
         label_stress=f"Below {stress_threshold_pct:g}%",
     )

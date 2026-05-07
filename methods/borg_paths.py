@@ -112,13 +112,8 @@ def _env_truthy(name: str) -> bool:
 def borg_mrf_filtered_enabled() -> bool:
     """
     True when Borg outputs should use the MRF-filtered objective suffix.
-
-    Prefer ``CEE_BORG_MRF_FILTERED``; ``CEE_BORG_MRFMASKED`` is deprecated but still honored.
     """
-    explicit = os.environ.get("CEE_BORG_MRF_FILTERED", "").strip()
-    if explicit:
-        return _env_truthy("CEE_BORG_MRF_FILTERED")
-    return _env_truthy("CEE_BORG_MRFMASKED")
+    return _env_truthy("CEE_BORG_MRF_FILTERED")
 
 
 def _normalize_mrf_filter_tag_for_suffix(tag: str) -> str:
@@ -126,8 +121,8 @@ def _normalize_mrf_filter_tag_for_suffix(tag: str) -> str:
     Map ``CEE_MRF_FILTER_TAG`` / ``CEE_MRF_FILTER_SOURCE`` values to the canonical
     filesystem segment used in ``*_mrffiltered_<segment>.csv`` names:
 
-    - ``regression`` — pub-reconstruction MRF mask (``_mrffiltered_regression``)
-    - ``perfect`` — perfect-information MRF mask
+    - ``regression`` — pub-reconstruction MRF filter (``_mrffiltered_regression``)
+    - ``perfect`` — perfect-information MRF filter
 
     User-facing tags such as ``regression_disagg`` / ``mrffiltered_regression`` map to ``regression``.
     """
@@ -157,14 +152,10 @@ def mrf_filtered_file_suffix() -> str:
 
     Set ``CEE_MRF_FILTER_TAG`` to a user-facing name (e.g. ``regression_disagg`` or ``perfect``)
     or derive from ``CEE_MRF_FILTER_SOURCE``.
-    Deprecated env aliases: ``CEE_MRF_MASK_TAG`` / ``CEE_MRF_MASK_SOURCE``.
     """
-    tag = os.environ.get("CEE_MRF_FILTER_TAG", os.environ.get("CEE_MRF_MASK_TAG", "")).strip().lower()
+    tag = os.environ.get("CEE_MRF_FILTER_TAG", "").strip().lower()
     if not tag:
-        src = os.environ.get(
-            "CEE_MRF_FILTER_SOURCE",
-            os.environ.get("CEE_MRF_MASK_SOURCE", "regression_disagg"),
-        ).strip().lower().replace("-", "_")
+        src = os.environ.get("CEE_MRF_FILTER_SOURCE", "regression_disagg").strip().lower().replace("-", "_")
         if src in ("perfect", "perfect_information", "pi", "perfect_foresight"):
             tag = "perfect"
         elif src in ("regression_disagg", "pub_reconstruction", "regression"):
@@ -173,11 +164,6 @@ def mrf_filtered_file_suffix() -> str:
             tag = "regression_disagg"
     canon = _normalize_mrf_filter_tag_for_suffix(tag)
     return f"_mrffiltered_{canon}"
-
-
-def mrf_masked_file_suffix() -> str:
-    """Deprecated alias for :func:`mrf_filtered_file_suffix` (legacy name)."""
-    return mrf_filtered_file_suffix()
 
 
 def borg_moea_csv_path(
@@ -266,8 +252,7 @@ def resolve_borg_moea_csv_path(
     mrf_filter_tag: Optional[str] = None,
 ) -> str:
     """
-    Return a path to an existing Borg CSV if possible: prefer canonical ``_mrffiltered_*``,
-    then legacy ``_mrfmasked_*`` on disk.
+    Return a path to the canonical Borg CSV (``_mrffiltered_*`` when filtering is enabled).
     """
     canonical = Path(
         borg_moea_csv_path(
@@ -278,15 +263,6 @@ def resolve_borg_moea_csv_path(
             mrf_filter_tag=mrf_filter_tag,
         )
     )
-    if canonical.is_file():
-        return str(canonical)
-    use_mrf = mrf_filtered if mrf_filtered is not None else borg_mrf_filtered_enabled()
-    if use_mrf:
-        legacy = canonical.with_name(
-            canonical.name.replace("_mrffiltered_", "_mrfmasked_", 1)
-        )
-        if legacy.is_file():
-            return str(legacy)
     return str(canonical)
 
 

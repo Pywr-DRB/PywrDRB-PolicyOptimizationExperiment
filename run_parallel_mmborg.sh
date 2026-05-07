@@ -9,8 +9,8 @@
 #   (Use only canonical tokens: full, regression, perfect.)
 #
 # Other env overrides (VAR=value sbatch run_parallel_mmborg.sh):
-#   BORG_SEED_MASKED
-#   BORG_SEED_UNMASKED
+#   BORG_SEED_FILTERED
+#   BORG_SEED_UNFILTERED
 #   MRF_RANGES_JSON
 #   CEE_MRF_FILTER_TAG
 #   CEE_BORG_RESERVOIRS
@@ -28,7 +28,7 @@
 
 # -----------------------------------------------------------------------------
 # Runtime context: always execute from submit directory/repo root so relative
-# paths (Borg script, masking JSON, logs, outputs) resolve the same on all ranks.
+# paths (Borg script, filtering JSON, logs, outputs) resolve the same on all ranks.
 # -----------------------------------------------------------------------------
 if [[ -n "${SLURM_SUBMIT_DIR:-}" ]]; then
   SCRIPT_DIR="${SLURM_SUBMIT_DIR}"
@@ -41,8 +41,8 @@ export PYTHONPATH="${SCRIPT_DIR}:${PYTHONPATH:-}"
 echo "[paths] SCRIPT_DIR=${SCRIPT_DIR}  SLURM_SUBMIT_DIR=${SLURM_SUBMIT_DIR:-<unset>}"
 
 BORG_SCRIPT="${SCRIPT_DIR}/03_parallel_borg_run.py"
-_PUB_JSON="${SCRIPT_DIR}/preprocessing_outputs/masking/pub_reconstruction/lower_basin_mrf_active_ranges.json"
-_PERF_JSON="${SCRIPT_DIR}/preprocessing_outputs/masking/perfect_information/lower_basin_mrf_active_ranges.json"
+_PUB_JSON="${SCRIPT_DIR}/preprocessing_outputs/filtering/pub_reconstruction/lower_basin_mrf_active_ranges.json"
+_PERF_JSON="${SCRIPT_DIR}/preprocessing_outputs/filtering/perfect_information/lower_basin_mrf_active_ranges.json"
 
 # -----------------------------------------------------------------------------
 # Environment/bootstrap: pin Python + BLAS/OpenMP threading for stable MPI runs.
@@ -58,8 +58,8 @@ export VECLIB_MAXIMUM_THREADS=1
 export BLIS_NUM_THREADS=1
 export PYTHONOPTIMIZE=1
 
-BORG_SEED_MASKED="${BORG_SEED_MASKED:-71}"
-BORG_SEED_UNMASKED="${BORG_SEED_UNMASKED:-72}"
+BORG_SEED_FILTERED="${BORG_SEED_FILTERED:-71}"
+BORG_SEED_UNFILTERED="${BORG_SEED_UNFILTERED:-72}"
 
 # -----------------------------------------------------------------------------
 # Worklist selection: default lower-basin calibration set, with env overrides
@@ -101,7 +101,7 @@ for _p in "${_PHASES_RAW[@]}"; do
 done
 echo "[phases] CEE_BORG_MODES -> ${PHASES[*]}"
 
-# Fail fast before starting MPI if required mask JSONs are missing.
+# Fail fast before starting MPI if required filter JSONs are missing.
 for ph in "${PHASES[@]}"; do
   case "$ph" in
     full) ;;
@@ -131,7 +131,7 @@ submit_job() {
     datetime=$(date '+%Y-%m-%d %H:%M:%S')
     n_processors=$(($SLURM_NNODES * $SLURM_NTASKS_PER_NODE))
 
-    # Per-job phase context: determines whether objectives are masked and
+    # Per-job phase context: determines whether objectives are filtered and
     # which seed / JSON / suffix are used in output naming.
     local RUN_SEED
     if [[ "$USE_MRF_FLAG" -eq 1 ]]; then
@@ -151,7 +151,7 @@ submit_job() {
 
     if [[ " ${MRF_RESERVOIRS[@]} " =~ " ${RESERVOIR_NAME} " ]]; then
         if [[ "$USE_MRF_FLAG" -eq 1 ]]; then
-            RUN_SEED="$BORG_SEED_MASKED"
+            RUN_SEED="$BORG_SEED_FILTERED"
             if [[ -z "${CEE_MRF_FILTER_TAG:-}" ]]; then
               case "${CEE_MRF_FILTER_SOURCE:-regression_disagg}" in
                 perfect) export CEE_MRF_FILTER_TAG=perfect ;;
@@ -161,12 +161,12 @@ submit_job() {
             echo "Running: POLICY_TYPE=$POLICY_TYPE, RESERVOIR_NAME=$RESERVOIR_NAME seed=$RUN_SEED USE_MRF=true (MRF-filtered objectives, tag=_mrffiltered_${CEE_MRF_FILTER_TAG})"
             echo "Datetime: $datetime"
             echo "Total processors: $n_processors"
-            echo "  [MRF] Masked objectives — JSON: $MRF_RANGES_JSON"
+            echo "  [MRF] Filtered objectives — JSON: $MRF_RANGES_JSON"
             time mpirun --wdir "$SCRIPT_DIR" --bind-to core --map-by ppr:${SLURM_NTASKS_PER_NODE}:node -np "$n_processors" \
                 python "$BORG_SCRIPT" "$POLICY_TYPE" "$RESERVOIR_NAME" "$RUN_SEED" "$MRF_RANGES_JSON" "true"
         else
             unset CEE_MRF_FILTER_TAG
-            RUN_SEED="$BORG_SEED_UNMASKED"
+            RUN_SEED="$BORG_SEED_UNFILTERED"
             echo "Running: POLICY_TYPE=$POLICY_TYPE, RESERVOIR_NAME=$RESERVOIR_NAME seed=$RUN_SEED USE_MRF=false (full series)"
             echo "Datetime: $datetime"
             echo "Total processors: $n_processors"
@@ -175,7 +175,7 @@ submit_job() {
         fi
     else
         unset CEE_MRF_FILTER_TAG
-        RUN_SEED="$BORG_SEED_UNMASKED"
+        RUN_SEED="$BORG_SEED_UNFILTERED"
         echo "Running: POLICY_TYPE=$POLICY_TYPE, RESERVOIR_NAME=$RESERVOIR_NAME seed=$RUN_SEED (non-DRB, full series)"
         echo "Datetime: $datetime"
         echo "Total processors: $n_processors"

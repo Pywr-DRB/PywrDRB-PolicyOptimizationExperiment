@@ -13,13 +13,11 @@ Filename pattern (multi-island / MMBorg):
   MMBorg_<n>M_<POLICY>_<RESERVOIR>_nfe<N>_seed<S>_<island>.runtime
   MMBorg_..._seed<S>_mrffiltered_regression_<island>.runtime
   MMBorg_..._seed<S>_mrffiltered_perfect_<island>.runtime
-  MMBorg_..._seed<S>_mrfmasked_<island>.runtime (legacy)
-  MMBorg_..._seed<S>_mrfmasked_perfect_<island>.runtime (legacy)
 
 Run from the moeaframework/ directory:
 
   python organize_borg_outputs.py
-  python organize_borg_outputs.py --src ../outputs --dst ./outputs --skip-mrfmasked
+  python organize_borg_outputs.py --src ../outputs --dst ./outputs
 """
 
 import argparse
@@ -30,7 +28,7 @@ from pathlib import Path
 RUNTIME_RE = re.compile(
     r"^MMBorg_(?P<islands>\d+)M_(?P<policy>STARFIT|RBF|PWL)_(?P<res>.+)_nfe(?P<nfe>\d+)"
     r"_seed(?P<seed>\d+)"
-    r"(?P<mrf>(?:_mrffiltered_(?:regression|perfect)|_mrfmasked(?:_(?:perfect|regression))?))?"
+    r"(?P<mrf>(?:_mrffiltered_(?:regression|perfect)))?"
     r"_(?P<island>\d+)\.runtime$"
 )
 
@@ -49,11 +47,6 @@ def main() -> None:
         default=None,
         help="MOEA OUT_ROOT layout root (default: ./outputs next to this script)",
     )
-    ap.add_argument(
-        "--skip-mrfmasked",
-        action="store_true",
-        help="Skip runtimes with _mrfmasked in the name (use if only running MOEA on full-series seeds)",
-    )
     args = ap.parse_args()
 
     here = Path(__file__).resolve().parent
@@ -69,8 +62,6 @@ def main() -> None:
         m = RUNTIME_RE.match(path.name)
         if not m:
             print(f"[skip] unmatched name: {path.name}")
-            continue
-        if args.skip_mrfmasked and m.group("mrf"):
             continue
         policy = m.group("policy")
         res = m.group("res")

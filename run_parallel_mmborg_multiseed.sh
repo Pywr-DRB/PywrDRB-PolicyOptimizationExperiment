@@ -30,8 +30,8 @@ export PYTHONPATH="${SCRIPT_DIR}:${PYTHONPATH:-}"
 echo "[paths] SCRIPT_DIR=${SCRIPT_DIR}  SLURM_SUBMIT_DIR=${SLURM_SUBMIT_DIR:-<unset>}"
 
 BORG_SCRIPT="${SCRIPT_DIR}/03_parallel_borg_run.py"
-_PUB_JSON="${SCRIPT_DIR}/preprocessing_outputs/masking/pub_reconstruction/lower_basin_mrf_active_ranges.json"
-_PERF_JSON="${SCRIPT_DIR}/preprocessing_outputs/masking/perfect_information/lower_basin_mrf_active_ranges.json"
+_PUB_JSON="${SCRIPT_DIR}/preprocessing_outputs/filtering/pub_reconstruction/lower_basin_mrf_active_ranges.json"
+_PERF_JSON="${SCRIPT_DIR}/preprocessing_outputs/filtering/perfect_information/lower_basin_mrf_active_ranges.json"
 
 module load python/3.11.5
 source /home/fs02/pmr82_0001/ms3654/envs/borg-env/bin/activate
@@ -123,7 +123,7 @@ submit_job() {
 
   if [[ " ${MRF_RESERVOIRS[@]} " =~ " ${RESERVOIR_NAME} " ]]; then
     if [[ "$USE_MRF_FLAG" -eq 1 ]]; then
-      echo "  [MRF] Masked objectives — JSON: $MRF_RANGES_JSON"
+      echo "  [MRF] Filtered objectives — JSON: $MRF_RANGES_JSON"
       time mpirun --wdir "$SCRIPT_DIR" --oversubscribe -np "$n_processors" \
         python "$BORG_SCRIPT" "$POLICY_TYPE" "$RESERVOIR_NAME" "$RUN_SEED" "$MRF_RANGES_JSON" "true"
     else

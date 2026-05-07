@@ -294,22 +294,22 @@ def compare_series(a: pd.Series, b: pd.Series, name: str, rtol=0.0, atol=0.0):
         print(f"[WARN] {name}: no overlapping index to compare.")
         return False
     if rtol == 0.0 and atol == 0.0:
-        same_mask = (a.values == b.values)
-        ok = bool(same_mask.all())
+        same_filter = (a.values == b.values)
+        ok = bool(same_filter.all())
         print(f"[COMPARE:{name}] exact equality: {ok} over {len(a)} steps.")
         if not ok:
-            first_bad = int(np.where(~same_mask)[0][0])
+            first_bad = int(np.where(~same_filter)[0][0])
             ts = a.index[first_bad]
             print(
                 f"[COMPARE:{name}] first divergence @ {ts}: "
                 f"a={float(a.iloc[first_bad]):.10g}, b={float(b.iloc[first_bad]):.10g}"
             )
         return ok
-    allclose_mask = np.isclose(a.values, b.values, rtol=rtol, atol=atol, equal_nan=True)
-    ok = bool(allclose_mask.all())
+    allclose_filter = np.isclose(a.values, b.values, rtol=rtol, atol=atol, equal_nan=True)
+    ok = bool(allclose_filter.all())
     print(f"[COMPARE:{name}] allclose rtol={rtol} atol={atol}: {ok} over {len(a)} steps.")
     if not ok:
-        first_bad = int(np.where(~allclose_mask)[0][0])
+        first_bad = int(np.where(~allclose_filter)[0][0])
         ts = a.index[first_bad]
         abs_err = float(np.abs(a.iloc[first_bad] - b.iloc[first_bad]))
         print(

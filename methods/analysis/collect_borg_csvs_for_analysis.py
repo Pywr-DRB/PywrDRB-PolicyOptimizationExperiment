@@ -18,7 +18,7 @@ import pandas as pd
 # Final aggregated CSV from Borg (not per-island runtime)
 CSV_RE = re.compile(
     r"^MMBorg_(?P<islands>\d+)M_(?P<policy>STARFIT|RBF|PWL)_(?P<res>.+)_nfe(?P<nfe>\d+)"
-    r"_seed(?P<seed>\d+)(?P<mrf>(?:_mrffiltered|_mrfmasked)(?:_perfect|_regression)?)?\.csv$"
+    r"_seed(?P<seed>\d+)(?P<mrf>(?:_mrffiltered)(?:_perfect|_regression)?)?\.csv$"
 )
 
 
@@ -60,8 +60,6 @@ def main() -> None:
             variant = "perfect"
         elif mrf_g and "_regression" in mrf_g:
             variant = "regression"
-        elif mrf_g:
-            variant = "legacy_mrf_token"
         else:
             variant = "none"
         df.insert(6, "mrf_filter_variant", variant)

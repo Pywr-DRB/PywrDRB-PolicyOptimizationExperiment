@@ -24,7 +24,7 @@
 #   | MRF-filtered perfect           | borg_mrffiltered_perfect_foresight | FLOW_MODE_PERFECT            |
 #
 # Core defaults: CEE_POSTPROCESS_BUNDLE=all, FLOW_MODE_FULL=perfect_foresight,
-# BORG_SEED_FILTERED=71, BORG_SEED_UNMASKED=72. All focal picks + all policies: leave CEE_DESIRED_PICKS /
+# BORG_SEED_FILTERED=71, BORG_SEED_UNFILTERED=72. All focal picks + all policies: leave CEE_DESIRED_PICKS /
 # CEE_FIGURE_POLICIES unset.
 #
 # Speed tips: CEE_FIG12_FIRST=0 skips the extra Fig1/2-only pass; FIG_SCRIPT_ARGS="--plots-only" reuses
@@ -71,9 +71,9 @@ _default_timeseries_ready() {
   [[ -f "${DEFAULT_PYWR_H5}" ]]
 }
 
-# Borg seed for MRF-filtered objective runs (preferred name); legacy: BORG_SEED_MASKED.
-BORG_SEED_FILTERED="${BORG_SEED_FILTERED:-${BORG_SEED_MASKED:-71}}"
-BORG_SEED_UNMASKED="${BORG_SEED_UNMASKED:-72}"
+# Borg seed for MRF-filtered objective runs (preferred name); legacy: BORG_SEED_FILTERED.
+BORG_SEED_FILTERED="${BORG_SEED_FILTERED:-${BORG_SEED_FILTERED:-71}}"
+BORG_SEED_UNFILTERED="${BORG_SEED_UNFILTERED:-72}"
 
 FIG_SCRIPT="${FIG_SCRIPT:-04_make_figures.py}"
 # Extra args for 04_make_figures.py (e.g. --plots-only).
@@ -132,7 +132,7 @@ else
 fi
 
 # Which Borg CSV / MRF-filtered bundle(s) to run: overrides DEBUG_FAST RUN_* when set.
-#   full              — unmasked Borg -> figures/borg_full_series/ (Pywr: FLOW_MODE_FULL)
+#   full              — full-series Borg -> figures/borg_full_series/ (Pywr: FLOW_MODE_FULL)
 #   regression_disagg — regression-disaggregation MRF-filtered Borg -> borg_mrffiltered_regression/ (Pywr: FLOW_MODE_REGRESSION_DISAGG)
 #   perfect           — perfect-foresight MRF-filtered Borg -> borg_mrffiltered_perfect_foresight/ (Pywr: FLOW_MODE_PERFECT)
 #   all               — all three (same as full,regression_disagg,perfect). Comma-separated OK, e.g. regression_disagg,perfect
@@ -230,11 +230,11 @@ else
     _summ_filtered perfect || true
   fi
   if [[ "${RUN_FULL}" == "1" ]]; then
-    echo "Summarizing Borg solution counts (full series, seed ${BORG_SEED_UNMASKED})..."
-    CEE_BORG_SEED="${BORG_SEED_UNMASKED}" CEE_BORG_MRF_FILTERED=0 \
+    echo "Summarizing Borg solution counts (full series, seed ${BORG_SEED_UNFILTERED})..."
+    CEE_BORG_SEED="${BORG_SEED_UNFILTERED}" CEE_BORG_MRF_FILTERED=0 \
       python -m methods.postprocess.summarize_optimization \
-      -o "${SCRIPT_DIR}/outputs/optimization_summary_seed${BORG_SEED_UNMASKED}_full.csv" \
-      --out-json "${SCRIPT_DIR}/outputs/optimization_summary_seed${BORG_SEED_UNMASKED}_full.json" || true
+      -o "${SCRIPT_DIR}/outputs/optimization_summary_seed${BORG_SEED_UNFILTERED}_full.csv" \
+      --out-json "${SCRIPT_DIR}/outputs/optimization_summary_seed${BORG_SEED_UNFILTERED}_full.json" || true
   fi
 fi
 
@@ -276,7 +276,7 @@ FIGURES_SPEC_REGRESSION_DISAGG="${CEE_FIGURES_REGRESSION_DISAGG:-${CEE_FIGURES_A
 FIGURES_SPEC_PERFECT="${CEE_FIGURES_PERFECT:-${CEE_FIGURES_ALL}}"
 
 if [[ "${RUN_FULL}" == "1" ]]; then
-  echo "== Full-series Borg figures + validation (seed ${BORG_SEED_UNMASKED}) =="
+  echo "== Full-series Borg figures + validation (seed ${BORG_SEED_UNFILTERED}) =="
   full_validate_extra_args=""
   full_figures_spec="${FIGURES_SPEC_FULL}"
   full_fig_args=""
@@ -292,13 +292,13 @@ if [[ "${RUN_FULL}" == "1" ]]; then
   fi
   if [[ "${DEBUG_VALIDATE_ONLY}" == "1" ]]; then
     # Single-line env prefix avoids fragile '\' continuations (trailing space / CRLF can break assignments).
-    CEE_BORG_SEED="${BORG_SEED_UNMASKED}" CEE_BORG_MRF_FILTERED=0 CEE_FIG_SUBDIR=borg_full_series CEE_PYWR_FLOW_PREDICTION_MODE="${FLOW_MODE_FULL}" bash -lc "python -m methods.postprocess.figures_validation ${VALIDATE_ARGS} ${full_validate_extra_args}" || true
+    CEE_BORG_SEED="${BORG_SEED_UNFILTERED}" CEE_BORG_MRF_FILTERED=0 CEE_FIG_SUBDIR=borg_full_series CEE_PYWR_FLOW_PREDICTION_MODE="${FLOW_MODE_FULL}" bash -lc "python -m methods.postprocess.figures_validation ${VALIDATE_ARGS} ${full_validate_extra_args}" || true
   elif [[ "${CEE_FIG12_FIRST}" == "1" && "${DEBUG_FAST}" != "1" ]]; then
     echo "[phase] Fig1/Fig2 first pass (borg_full_series)"
-    CEE_BORG_SEED="${BORG_SEED_UNMASKED}" CEE_BORG_MRF_FILTERED=0 CEE_FIG_SUBDIR=borg_full_series CEE_SKIP_PYWR=1 CEE_REMAKE_DYNAMICS_PLOTS=0 CEE_PYWR_FLOW_PREDICTION_MODE="${FLOW_MODE_FULL}" python "${SCRIPT_DIR}/${FIG_SCRIPT}" ${FIG_SCRIPT_ARGS} ${full_fig_args} --skip-stage2 || true
-    CEE_BORG_SEED="${BORG_SEED_UNMASKED}" CEE_BORG_MRF_FILTERED=0 CEE_FIG_SUBDIR=borg_full_series CEE_PYWR_FLOW_PREDICTION_MODE="${FLOW_MODE_FULL}" python "${SCRIPT_DIR}/${FIG_SCRIPT}" ${FIG_SCRIPT_ARGS} ${full_fig_args} || true
+    CEE_BORG_SEED="${BORG_SEED_UNFILTERED}" CEE_BORG_MRF_FILTERED=0 CEE_FIG_SUBDIR=borg_full_series CEE_SKIP_PYWR=1 CEE_REMAKE_DYNAMICS_PLOTS=0 CEE_PYWR_FLOW_PREDICTION_MODE="${FLOW_MODE_FULL}" python "${SCRIPT_DIR}/${FIG_SCRIPT}" ${FIG_SCRIPT_ARGS} ${full_fig_args} --skip-stage2 || true
+    CEE_BORG_SEED="${BORG_SEED_UNFILTERED}" CEE_BORG_MRF_FILTERED=0 CEE_FIG_SUBDIR=borg_full_series CEE_PYWR_FLOW_PREDICTION_MODE="${FLOW_MODE_FULL}" python "${SCRIPT_DIR}/${FIG_SCRIPT}" ${FIG_SCRIPT_ARGS} ${full_fig_args} || true
   else
-    CEE_BORG_SEED="${BORG_SEED_UNMASKED}" CEE_BORG_MRF_FILTERED=0 CEE_FIG_SUBDIR=borg_full_series CEE_PYWR_FLOW_PREDICTION_MODE="${FLOW_MODE_FULL}" python "${SCRIPT_DIR}/${FIG_SCRIPT}" ${FIG_SCRIPT_ARGS} ${full_fig_args} || true
+    CEE_BORG_SEED="${BORG_SEED_UNFILTERED}" CEE_BORG_MRF_FILTERED=0 CEE_FIG_SUBDIR=borg_full_series CEE_PYWR_FLOW_PREDICTION_MODE="${FLOW_MODE_FULL}" python "${SCRIPT_DIR}/${FIG_SCRIPT}" ${FIG_SCRIPT_ARGS} ${full_fig_args} || true
   fi
   echo "Full-series figures -> figures/borg_full_series/"
 fi

@@ -820,9 +820,9 @@ def aggregate_stage3_multipanels_from_manifest(
                 s = s.interpolate(limit_direction="both").bfill().ffill()
                 arr = np.full(12, np.nan, dtype=float)
                 for m in range(1, 13):
-                    mask = reference_idx.month == m
-                    if np.any(mask):
-                        arr[m - 1] = float(np.nanmedian(np.asarray(s[mask].to_numpy(dtype=float), dtype=float)))
+                    filter = reference_idx.month == m
+                    if np.any(filter):
+                        arr[m - 1] = float(np.nanmedian(np.asarray(s[filter].to_numpy(dtype=float), dtype=float)))
                 monthly_release_observed[rname] = arr
             except Exception as e:
                 print(f"[stage3] observed monthly release {rname}: {e}", flush=True)

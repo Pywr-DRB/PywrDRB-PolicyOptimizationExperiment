@@ -7,7 +7,7 @@ which has been modified for use with the reservoir problem.
 For more info, see:
 https://github.com/philip928lin/BorgTraining/tree/main (Private)
 
-Optional MRF masking: objectives can be evaluated only on "normal operations"
+Optional MRF filtering: objectives can be evaluated only on "normal operations"
 days for DRB calibration reservoirs (F.E. Walter, Prompton, Beltzville, Blue Marsh)
 when extra CLI args are provided (see below). Eligibility matches ``reservoir_options``
 in ``methods.config`` / pywrdrb.
@@ -32,17 +32,17 @@ from methods.config import policy_n_params, policy_param_bounds, get_starfit_par
 from methods.config import reservoir_capacity, INERTIA_BY_RESERVOIR, release_max_by_reservoir
 from methods.config import reservoir_options
 
-from methods.preprocessing.mrf_masking import (
+from methods.preprocessing.mrf_filtering import (
     load_mrf_ranges,
-    build_normal_ops_mask,
-    validate_mask_alignment,
+    build_normal_ops_filter,
+    validate_filter_alignment,
 )
 from methods.borg_paths import mrf_filtered_file_suffix
 
 # Project root: do not rely on process CWD under Slurm/MPI (often job spool on some ranks).
 _CEE_ROOT = os.path.dirname(os.path.abspath(__file__))
-_DEFAULT_MRF_JSON = "preprocessing_outputs/masking/pub_reconstruction/lower_basin_mrf_active_ranges.json"
-_LEGACY_MRF_JSON = "preprocessing_outputs/masking/lower_basin_mrf_active_ranges.json"
+_DEFAULT_MRF_JSON = "preprocessing_outputs/filtering/pub_reconstruction/lower_basin_mrf_active_ranges.json"
+_LEGACY_MRF_JSON = "preprocessing_outputs/filtering/lower_basin_mrf_active_ranges.json"
 root_dir = _CEE_ROOT
 pn = PathNavigator(root_dir, max_depth=2)
 pn.chdir()
@@ -67,14 +67,14 @@ def _log(msg: str) -> None:
 
 
 def _resolve_mrf_ranges_path(path_str: str) -> Path:
-    """Resolve MRF JSON; fall back to legacy flat masking path if the bundle path is missing."""
+    """Resolve MRF JSON; fall back to legacy flat filtering path if the bundle path is missing."""
     p = Path(path_str)
     cand = p if p.is_absolute() else Path(_CEE_ROOT) / p
     if cand.exists():
         return cand
     leg = Path(_CEE_ROOT) / _LEGACY_MRF_JSON
     if leg.exists():
-        _log(f"[MRF Masking] Primary JSON missing ({cand}); using legacy path: {leg}")
+        _log(f"[MRF Filtering] Primary JSON missing ({cand}); using legacy path: {leg}")
         return leg
     return cand
 
@@ -82,7 +82,7 @@ def _resolve_mrf_ranges_path(path_str: str) -> Path:
 ### CLI: POLICY_TYPE RESERVOIR_NAME [seed] [mrf_json] [use_mrf]
 #  - seed: optional; default SEED from config
 #  - mrf_json: optional path to MRF ranges JSON (default _DEFAULT_MRF_JSON under project root)
-#  - use_mrf: "true"/"false" — if true, apply masking for reservoirs in reservoir_options
+#  - use_mrf: "true"/"false" — if true, apply filtering for reservoirs in reservoir_options
 assert len(sys.argv) > 2, "POLICY_TYPE and RESERVOIR_NAME must be provided by command line."
 
 POLICY_TYPE = str(sys.argv[1])
@@ -95,11 +95,11 @@ MRF_RANGES_JSON = (
 )
 cee_mrf = os.environ.get("CEE_USE_MRF", "").strip().lower()
 if cee_mrf in ("0", "false", "no", "off"):
-    USE_MRF_MASKING = False
+    USE_MRF_FILTERING = False
 elif cee_mrf in ("1", "true", "yes", "on"):
-    USE_MRF_MASKING = True
+    USE_MRF_FILTERING = True
 else:
-    USE_MRF_MASKING = (
+    USE_MRF_FILTERING = (
         str(sys.argv[5]).strip().lower() in ("1", "true", "yes", "on")
         if len(sys.argv) > 5
         else False
@@ -143,29 +143,29 @@ initial_storage_obs = storage_obs[0]
 R_MAX = release_max_by_reservoir[RESERVOIR_NAME]
 iset = INERTIA_BY_RESERVOIR[RESERVOIR_NAME]
 
-normal_ops_mask = None
+normal_ops_filter = None
 mrf_ranges_dict = None
 
-if USE_MRF_MASKING:
+if USE_MRF_FILTERING:
     # fewalter, prompton, beltzvilleCombined, blueMarsh — same as methods.config / pywrdrb
     if RESERVOIR_NAME in reservoir_options:
-        _log(f"[MRF Masking] Requested for {RESERVOIR_NAME}")
+        _log(f"[MRF Filtering] Requested for {RESERVOIR_NAME}")
 
         mrf_ranges_path = _resolve_mrf_ranges_path(MRF_RANGES_JSON)
 
         if not mrf_ranges_path.exists():
             _log(f"[WARNING] MRF ranges JSON not found: {mrf_ranges_path}")
-            _log("[WARNING] Continuing without MRF masking.")
-            USE_MRF_MASKING = False
+            _log("[WARNING] Continuing without MRF filtering.")
+            USE_MRF_FILTERING = False
         else:
-            _log(f"[MRF Masking] Loading MRF ranges from: {mrf_ranges_path}")
+            _log(f"[MRF Filtering] Loading MRF ranges from: {mrf_ranges_path}")
             mrf_ranges_dict = load_mrf_ranges(str(mrf_ranges_path))
 
             mode = "RES" if RESERVOIR_NAME in mrf_ranges_dict else "ANY"
             if mode == "ANY":
-                _log("[MRF Masking] Using ANY_lower_basin ranges (reservoir-specific not found)")
+                _log("[MRF Filtering] Using ANY_lower_basin ranges (reservoir-specific not found)")
 
-            normal_ops_mask = build_normal_ops_mask(
+            normal_ops_filter = build_normal_ops_filter(
                 datetime_index=datetime,
                 mrf_ranges_dict=mrf_ranges_dict,
                 reservoir_name=RESERVOIR_NAME,
@@ -173,38 +173,38 @@ if USE_MRF_MASKING:
                 buffer_days=MRF_NORMAL_OPS_BUFFER_DAYS,
             )
 
-            is_valid, msg = validate_mask_alignment(
+            is_valid, msg = validate_filter_alignment(
                 datetime_index=datetime,
-                normal_ops_mask=normal_ops_mask,
+                normal_ops_filter=normal_ops_filter,
                 min_normal_days=365,
             )
 
             if not is_valid:
-                _log(f"[ERROR] MRF mask validation failed: {msg}")
-                _log("[ERROR] Disabling MRF masking.")
-                USE_MRF_MASKING = False
-                normal_ops_mask = None
+                _log(f"[ERROR] MRF filter validation failed: {msg}")
+                _log("[ERROR] Disabling MRF filtering.")
+                USE_MRF_FILTERING = False
+                normal_ops_filter = None
             else:
-                n_normal = int(np.sum(normal_ops_mask))
-                n_total = len(normal_ops_mask)
+                n_normal = int(np.sum(normal_ops_filter))
+                n_total = len(normal_ops_filter)
                 pct_normal = 100.0 * n_normal / n_total
-                _log(f"[MRF Masking] {msg}")
+                _log(f"[MRF Filtering] {msg}")
                 _log(
-                    f"[MRF Masking] Buffer: {MRF_NORMAL_OPS_BUFFER_DAYS} days "
+                    f"[MRF Filtering] Buffer: {MRF_NORMAL_OPS_BUFFER_DAYS} days "
                     "before/after MRF-active (excluded from normal ops)"
                 )
                 _log(
-                    f"[MRF Masking] Will evaluate objectives on {n_normal}/{n_total} days "
+                    f"[MRF Filtering] Will evaluate objectives on {n_normal}/{n_total} days "
                     f"({pct_normal:.1f}%)"
                 )
     else:
         _log(
-            f"[MRF Masking] Ignored for {RESERVOIR_NAME} "
+            f"[MRF Filtering] Ignored for {RESERVOIR_NAME} "
             f"(not in reservoir_options: {list(reservoir_options)})."
         )
-        USE_MRF_MASKING = False
+        USE_MRF_FILTERING = False
 else:
-    _log("[MRF Masking] Off (Slurm: USE_MRF=false; argv: omit or pass false; env: CEE_USE_MRF=0).")
+    _log("[MRF Filtering] Off (Slurm: USE_MRF=false; argv: omit or pass false; env: CEE_USE_MRF=0).")
 
 release_obj_func = ObjectiveCalculator(
     metrics=RELEASE_METRICS,
@@ -223,7 +223,7 @@ storage_obj_func = ObjectiveCalculator(
 
 
 def evaluate(*vars):
-    """One Borg evaluation: simulate full series; objectives on full or masked days."""
+    """One Borg evaluation: simulate full series; objectives on full or filtered days."""
 
     reservoir = Reservoir(
         inflow=inflow_obs,
@@ -260,20 +260,20 @@ def evaluate(*vars):
     if np.isnan(sim_release).any() or np.isnan(sim_storage).any():
         print(f"Simulation generated NaN for {RESERVOIR_NAME}, {POLICY_TYPE} with parameters {vars}.")
 
-    if USE_MRF_MASKING and normal_ops_mask is not None:
-        obs_release_masked = release_obs[normal_ops_mask]
-        obs_storage_masked = storage_obs[normal_ops_mask]
-        sim_release_masked = sim_release[normal_ops_mask]
-        sim_storage_masked = sim_storage[normal_ops_mask]
+    if USE_MRF_FILTERING and normal_ops_filter is not None:
+        obs_release_filtered = release_obs[normal_ops_filter]
+        obs_storage_filtered = storage_obs[normal_ops_filter]
+        sim_release_filtered = sim_release[normal_ops_filter]
+        sim_storage_filtered = sim_storage[normal_ops_filter]
 
-        if len(obs_release_masked) < 365:
-            print(f"[WARN] Insufficient normal-ops days after masking: {len(obs_release_masked)}")
+        if len(obs_release_filtered) < 365:
+            print(f"[WARN] Insufficient normal-ops days after filtering: {len(obs_release_filtered)}")
             if NCONSTRS > 0:
                 return [9999.99] * NOBJS, [1.0]
             return [9999.99] * NOBJS,
 
-        release_objs = release_obj_func.calculate(obs=obs_release_masked, sim=sim_release_masked)
-        storage_objs = storage_obj_func.calculate(obs=obs_storage_masked, sim=sim_storage_masked)
+        release_objs = release_obj_func.calculate(obs=obs_release_filtered, sim=sim_release_filtered)
+        storage_objs = storage_obj_func.calculate(obs=obs_storage_filtered, sim=sim_storage_filtered)
     else:
         release_objs = release_obj_func.calculate(obs=release_obs, sim=sim_release)
         storage_objs = storage_obj_func.calculate(obs=storage_obs, sim=sim_storage)
@@ -314,7 +314,7 @@ if __name__ == "__main__":
             / f"MMBorg_{islands}M_{POLICY_TYPE}_{RESERVOIR_NAME}_nfe{NFE}_seed{borg_seed}"
         )
 
-    if USE_MRF_MASKING and normal_ops_mask is not None:
+    if USE_MRF_FILTERING and normal_ops_filter is not None:
         fname_base = pn.outputs.get() / f"{fname_base.name}{mrf_filtered_file_suffix()}"
 
     if islands == 1:
@@ -377,13 +377,13 @@ if __name__ == "__main__":
                 file.write(f"{key}: {value}\n")
             file.write("\nMRF objective filtering\n")
             file.write("=================\n")
-            file.write(f"enabled: {bool(USE_MRF_MASKING and normal_ops_mask is not None)}\n")
+            file.write(f"enabled: {bool(USE_MRF_FILTERING and normal_ops_filter is not None)}\n")
             file.write(f"mrf_json: {MRF_RANGES_JSON}\n")
-            if USE_MRF_MASKING and normal_ops_mask is not None:
+            if USE_MRF_FILTERING and normal_ops_filter is not None:
                 file.write(f"mrf_filename_suffix: {mrf_filtered_file_suffix()}\n")
-            if normal_ops_mask is not None:
-                n_normal = int(np.sum(normal_ops_mask))
-                n_total = len(normal_ops_mask)
+            if normal_ops_filter is not None:
+                n_normal = int(np.sum(normal_ops_filter))
+                n_total = len(normal_ops_filter)
                 file.write(f"normal_ops_days: {n_normal}/{n_total} ({100.0 * n_normal / n_total:.1f}%)\n")
 
         if islands == 1:

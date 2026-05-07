@@ -91,9 +91,9 @@ def _split_by_policy(obj_df: pd.DataFrame, meta_df: pd.DataFrame) -> tuple[list[
     obj_dfs: list[pd.DataFrame] = []
     labels: list[str] = []
     for p in policy_type_options:
-        mask = pol.str.upper() == str(p).upper()
-        if mask.any():
-            obj_dfs.append(base.loc[mask].copy())
+        filter = pol.str.upper() == str(p).upper()
+        if filter.any():
+            obj_dfs.append(base.loc[filter].copy())
             labels.append(POLICY_LABELS.get(p, p))
     return (obj_dfs, labels) if obj_dfs else ([base], ["ε-nondominated"])
 

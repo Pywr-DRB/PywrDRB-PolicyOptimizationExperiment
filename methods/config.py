@@ -4,7 +4,7 @@ Optimization and project paths for CEE6400.
 Canonical MOEA/objective/reservoir/policy settings come from
 ``pywrdrb.release_policies.config`` (Pywr-DRB). This module re-exports that
 namespace and overrides only filesystem paths so data and outputs live under
-the CEE6400 project tree, plus MRF masking settings used by this repo.
+the CEE6400 project tree, plus MRF filtering settings used by this repo.
 """
 import os
 
@@ -52,16 +52,16 @@ def get_pywr_pick_hdf5_dir() -> str:
     return os.path.abspath(v) if v else PYWR_PICK_HDF5_DIR
 
 
-# MRF masking assets (see methods.preprocessing.build_mrf_active_masks and build_mrf_masking_folder.sh)
-MRF_MASKING_ROOT = os.path.join(_PROJECT_ROOT, "preprocessing_outputs", "masking")
-MRF_MASK_JSON_PUB_RECON = os.path.join(
-    MRF_MASKING_ROOT, "pub_reconstruction", "lower_basin_mrf_active_ranges.json"
+# MRF filtering assets (see methods.preprocessing.build_mrf_active_filters and build_mrf_filtering_folder.sh)
+MRF_FILTERING_ROOT = os.path.join(_PROJECT_ROOT, "preprocessing_outputs", "filtering")
+MRF_FILTER_JSON_PUB_RECON = os.path.join(
+    MRF_FILTERING_ROOT, "pub_reconstruction", "lower_basin_mrf_active_ranges.json"
 )
-MRF_MASK_JSON_PERFECT_INFO = os.path.join(
-    MRF_MASKING_ROOT, "perfect_information", "lower_basin_mrf_active_ranges.json"
+MRF_FILTER_JSON_PERFECT_INFO = os.path.join(
+    MRF_FILTERING_ROOT, "perfect_information", "lower_basin_mrf_active_ranges.json"
 )
 
-# Buffer (days) around MRF “normal ops” windows for masking (not in pywrdrb config)
+# Buffer (days) around MRF “normal ops” windows for filtering (not in pywrdrb config)
 MRF_NORMAL_OPS_BUFFER_DAYS = 5
 
 # Normal operating ranges (NOR) by reservoir, lifted from

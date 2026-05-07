@@ -1,7 +1,7 @@
 # PywrDRB Policy Optimization Experiment
 Formerly known as the CEE project repo.
 
-This repository contains the optimization, postprocessing, and figure-generation workflow for parametric reservoir release policies (STARFIT, RBF, PWL). It is organized so a new user can run the pipeline in order: preprocessing -> MRF mask preparation -> mmBorg optimization -> postprocessing/figures -> optional advanced analyses.
+This repository contains the optimization, postprocessing, and figure-generation workflow for parametric reservoir release policies (STARFIT, RBF, PWL). It is organized so a new user can run the pipeline in order: preprocessing -> MRF filter preparation -> mmBorg optimization -> postprocessing/figures -> optional advanced analyses.
 
 ## Outline
 
@@ -95,7 +95,7 @@ If the shared libraries are missing or incompatible on your system, compile/rebu
 Top-level layout (folder-focused):
 
 - `methods/` - core Python package
-  - `methods/preprocessing/` - MRF mask preparation utilities
+  - `methods/preprocessing/` - MRF filtering preparation utilities
   - `methods/postprocess/` - baseline metrics + stage 1/2 figure orchestration
   - `methods/figures_stage3/` - full-Pareto manifest figure pipeline
   - `methods/ensemble/` - batch simulation/manifests/full-Pareto MPI runner
@@ -107,14 +107,14 @@ Top-level layout (folder-focused):
 - `outputs/` - Borg outputs and summary artifacts
 - `figures/` - generated figures
 - `pywr_data/` - Pywr run artifacts and caches
-- `preprocessing_outputs/` - generated masking bundles and contribution diagnostics
+- `preprocessing_outputs/` - generated filtering bundles and contribution diagnostics
 - `moeaframework/` - MOEA workflow scripts/helpers
 - `old/` - archived scripts kept for reference only
 
 Primary entrypoint scripts:
 
 - `run_preprocessing.sh`
-- `build_mrf_masking_folder.sh`
+- `build_mrf_filtering_folder.sh`
 - `run_parallel_mmborg.sh`
 - `run_parallel_mmborg_multiseed.sh`
 - `run_postprocessing_and_figures.sh`
@@ -136,16 +136,16 @@ Primary entrypoint scripts:
 sbatch run_preprocessing.sh
 ```
 
-### 2) Build MRF masking bundles
+### 2) Build MRF filtering bundles
 
 ```bash
-bash build_mrf_masking_folder.sh
+bash build_mrf_filtering_folder.sh
 ```
 
-This creates masking assets under:
+This creates filtering assets under:
 
-- `preprocessing_outputs/masking/pub_reconstruction/`
-- `preprocessing_outputs/masking/perfect_information/`
+- `preprocessing_outputs/filtering/pub_reconstruction/`
+- `preprocessing_outputs/filtering/perfect_information/`
 
 ### 3) Run mmBorg optimization
 
@@ -158,8 +158,8 @@ sbatch run_parallel_mmborg.sh
 Defaults:
 
 - `CEE_BORG_MODES=full,regression,perfect`
-- full-series seed: `BORG_SEED_UNMASKED=72`
-- filtered seed: `BORG_SEED_MASKED=71`
+- full-series seed: `BORG_SEED_UNFILTERED=72`
+- filtered seed: `BORG_SEED_FILTERED=71`
 
 Common variants:
 
@@ -173,8 +173,8 @@ CEE_MULTISEED_FROM=1 CEE_MULTISEED_TO=10 sbatch run_parallel_mmborg_multiseed.sh
 
 Filtered output naming:
 
-- `*_mrffiltered_regression` for regression-disaggregation masking
-- `*_mrffiltered_perfect` for perfect-information masking
+- `*_mrffiltered_regression` for regression-disaggregation filtering
+- `*_mrffiltered_perfect` for perfect-information filtering
 
 ### 4) Run postprocessing and figures (stages 1-2)
 
@@ -235,11 +235,11 @@ Primary workflow flags:
   - `CEE_BORG_SINGLE_PHASE`
   - `USE_MRF`
   - `CEE_MRF_FILTER_SOURCE`
-  - `BORG_SEED_UNMASKED`, `BORG_SEED_MASKED`
+  - `BORG_SEED_UNFILTERED`, `BORG_SEED_FILTERED`
 - Postprocessing:
   - `CEE_POSTPROCESS_BUNDLE`
   - `FLOW_MODE_FULL`, `FLOW_MODE_REGRESSION_DISAGG`, `FLOW_MODE_PERFECT`
-  - `BORG_SEED_UNMASKED`, `BORG_SEED_FILTERED`
+  - `BORG_SEED_UNFILTERED`, `BORG_SEED_FILTERED`
 
 ## Advanced Workflows
 

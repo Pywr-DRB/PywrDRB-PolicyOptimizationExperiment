@@ -109,8 +109,8 @@ def envelope_doy_from_matrix(
     x = np.arange(1, 367, dtype=float)
     out = {k: np.full(366, np.nan) for k in ("median", "q25", "q75", "q10", "q90")}
     for d in range(1, 367):
-        mask = doy == d
-        chunk = mat[mask, :].ravel()
+        filter = doy == d
+        chunk = mat[filter, :].ravel()
         chunk = chunk[np.isfinite(chunk)]
         if chunk.size == 0:
             continue
@@ -153,8 +153,8 @@ def envelope_month_from_matrix(
     x = np.arange(1, 13, dtype=float)
     out = {k: np.full(12, np.nan) for k in ("median", "q25", "q75", "q10", "q90")}
     for m in range(1, 13):
-        mask = mo == m
-        chunk = mat[mask, :].ravel()
+        filter = mo == m
+        chunk = mat[filter, :].ravel()
         chunk = chunk[np.isfinite(chunk)]
         if chunk.size == 0:
             continue
@@ -275,9 +275,9 @@ def observed_inflow_release_training(internal: str) -> Dict[str, Any]:
     )
     inf = inf_df[internal].astype(float).to_numpy()
     rel = rel_df[internal].astype(float).to_numpy()
-    mask = np.isfinite(inf) & np.isfinite(rel) & (inf > 0) & (rel > 0)
-    obs_x = inf[mask]
-    obs_y = rel[mask]
+    filter = np.isfinite(inf) & np.isfinite(rel) & (inf > 0) & (rel > 0)
+    obs_x = inf[filter]
+    obs_y = rel[filter]
     if obs_x.size == 0:
         return {"obs_x": obs_x, "obs_y": obs_y, "q20": np.nan, "q80": np.nan}
     q20 = float(np.percentile(obs_x, 20))
