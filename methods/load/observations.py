@@ -138,17 +138,10 @@ def get_observational_training_data(reservoir_name,
 
 def scale_inflow_observations(inflow_obs, release_obs):
     """
-    Scales inflow observations based on release observations,
-    assuming that total inflow volme is equal to total release volume.
-    
-    Scaling is applied on a monthly basis.
-    
-    Args:
-        inflow_obs (pd.DataFrame): Inflow observations.
-        release_obs (pd.DataFrame): Release observations.
-    
-    Returns:
-        pd.DataFrame: Scaled inflow observations.
+    Release-volume scaling for ``02_process_data.py`` (monthly sum(release)/sum(inflow), >= 1).
+
+    Distinct from NHM-based scaling in ``inflow_pub`` / Pywr ``pub_nhmv10_BC_withObsScaled``.
+    See ``02_process_data.py`` module docstring.
     """
     assert isinstance(inflow_obs, pd.DataFrame), \
         "inflow_obs must be a pandas DataFrame."

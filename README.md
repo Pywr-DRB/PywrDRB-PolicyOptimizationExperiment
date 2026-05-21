@@ -170,6 +170,8 @@ Force full regeneration of both MRF modes:
 FORCE_MRF_FILTER_BUILD=1 bash scripts/prepare_preprocessing_outputs.sh
 ```
 
+Full guide: **[MRF_FILTERING_README.md](MRF_FILTERING_README.md)** (buffer, eps, figures, normal-ops %). Fresh clone issues: **[SETUP.md](SETUP.md)**.
+
 ### 2) Build MRF filtering bundles
 
 ```bash

@@ -1,4 +1,7 @@
 # Define gauges and mappings
+#
+# inflow_gauges: reservoirs with a USGS inflow gauge only.
+# blueMarsh is omitted — no inflow gauge; Borg uses inflow_pub (pub reconstruction).
 from methods.config import RAW_DATA_DIR
 
 inflow_gauges = {

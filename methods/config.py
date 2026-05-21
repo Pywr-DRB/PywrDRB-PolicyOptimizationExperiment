@@ -66,8 +66,9 @@ MRF_FILTER_JSON_PERFECT_FORESIGHT = MRF_FILTER_DAILY_PERFECT_FORESIGHT
 MRF_FILTER_JSON_PUB_RECON = MRF_FILTER_DAILY_REGRESSION_DISAGG
 MRF_FILTER_JSON_PERFECT_INFO = MRF_FILTER_DAILY_PERFECT_FORESIGHT
 
-# Buffer (days) around MRF “normal ops” windows for filtering (not in pywrdrb config)
-MRF_NORMAL_OPS_BUFFER_DAYS = 5
+# MRF filtering (see MRF_FILTERING_README.md, build_mrf_filtering_folder.sh)
+MRF_ACTIVE_EPS_MGD = 0.1
+MRF_NORMAL_OPS_BUFFER_DAYS = 5  # days before/after each active range excluded from objectives
 
 # Normal operating ranges (NOR) by reservoir, lifted from
 # ``BASE_POLICY_CONTEXT_BY_RESERVOIR`` for quick discoverability in this repo.

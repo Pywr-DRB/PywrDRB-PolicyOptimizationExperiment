@@ -1,14 +1,25 @@
 """
 Build scaled inflow input for optimization.
 
-This script loads processed observed inflow/release/storage plus `inflow_pub`,
-then computes `inflow_scaled.csv` reservoir-by-reservoir by matching release volumes.
-Inflow source behavior is controlled by `--inflow-source`:
-- `pub_only` (default): always use `inflow_pub.csv`.
-- `observed_with_bluemarsh_pub`: use `inflow.csv` when available, but force `blueMarsh` from `inflow_pub.csv`.
+Scaling context (lab review / reproducibility)
+----------------------------------------------
+1. **Release-volume scaling (this script)** — Per reservoir and month, scale observed
+   inflows so monthly volume matches release (factor = sum(release)/sum(inflow), >= 1).
+   Output: ``obs_data/processed/inflow_scaled.csv``. Exploratory / dynamics; not the
+   main Borg training inflow.
 
-Output:
-- `obs_data/processed/inflow_scaled.csv`
+2. **NHM-based pub reconstruction** — Pywr inflow ``pub_nhmv10_BC_withObsScaled`` and
+   CSV ``inflow_pub.csv`` use NHM (gauge vs reservoir-base) style adjustments from the
+   pub reconstruction workflow. **Borg optimization uses ``inflow_pub``.**
+
+**Blue Marsh:** no USGS inflow gauge → not in ``inflow.csv``. Use ``--inflow-source
+observed_with_bluemarsh_pub`` or default ``pub_only`` so Blue Marsh comes from ``inflow_pub``.
+
+Inflow source flags:
+- ``pub_only`` (default): ``inflow_pub.csv`` for every reservoir present there.
+- ``observed_with_bluemarsh_pub``: ``inflow.csv`` when gauged; ``blueMarsh`` from ``inflow_pub``.
+
+Output: ``obs_data/processed/inflow_scaled.csv``
 """
 
 import argparse

@@ -29,7 +29,6 @@ import sys
 from pathlib import Path
 from typing import Tuple
 
-import matplotlib.pyplot as plt
 import pandas as pd
 
 # Add project root to path
@@ -47,7 +46,15 @@ if str(PYWR_SRC) not in sys.path:
     sys.path.insert(0, str(PYWR_SRC))
 
 import pywrdrb
-from methods.preprocessing.mrf_filtering import build_lower_basin_mrf_active_dict
+from methods.config import MRF_NORMAL_OPS_BUFFER_DAYS
+from methods.preprocessing.mrf_filtering import (
+    build_lower_basin_mrf_active_dict,
+    build_normal_ops_filter,
+    plot_mrf_contributions_active_periods,
+    plot_mrf_filtering_for_optimization,
+    summarize_filter_fractions,
+    write_filter_summary_txt,
+)
 
 
 def run_pywrdrb_simulation(
@@ -141,6 +148,12 @@ def main() -> None:
     parser.add_argument("--output-csv", type=Path, default="lower_basin_mrf_contributions.csv", help="Output CSV path for MRF contributions DataFrame")
     parser.add_argument("--output-json", type=Path, default=None, help="Optional output JSON path for MRF active date ranges (not required by optimization).")
     parser.add_argument("--epsilon", type=float, default=0.1, help="Threshold (MGD) for considering MRF contribution 'active'")
+    parser.add_argument(
+        "--buffer-days",
+        type=int,
+        default=None,
+        help=f"Days before/after each active range excluded from objectives (default: MRF_NORMAL_OPS_BUFFER_DAYS={MRF_NORMAL_OPS_BUFFER_DAYS})",
+    )
     parser.add_argument("--csv-output", type=Path, default=None, help="Optional: also export daily filter CSV for debugging")
     parser.add_argument("--skip-simulation", action="store_true", help="Skip simulation and use existing output file (must provide --existing-output)")
     parser.add_argument("--existing-output", type=Path, default=None, help="Path to existing PywrDRB output HDF5 file (if --skip-simulation)")
@@ -154,6 +167,11 @@ def main() -> None:
         help="Write standard filenames under preprocessing_outputs/filtering/<bundle>/",
     )
     args = parser.parse_args()
+    buffer_days = (
+        int(args.buffer_days)
+        if args.buffer_days is not None
+        else int(MRF_NORMAL_OPS_BUFFER_DAYS)
+    )
 
     if args.work_dir is None:
         args.work_dir = DEFAULT_MRF_PUB_SIM_DIR
@@ -165,7 +183,7 @@ def main() -> None:
         if args.csv_output is None:
             args.csv_output = bundle_dir / "mrf_active_filter_daily.csv"
         if args.plot_output is None:
-            args.plot_output = bundle_dir / f"mrf_contributions_{args.filter_bundle}.png"
+            args.plot_output = bundle_dir / "lower_basin_mrf_contributions_active_periods.png"
 
     if args.skip_simulation:
         if args.existing_output is None:
@@ -236,6 +254,39 @@ def main() -> None:
         )
         print(f"✓ Wrote traceability metadata: {trace_path}")
 
+    normal_ops = build_normal_ops_filter(
+        df_mrf.index,
+        mrf_ranges_dict,
+        mode="ANY",
+        buffer_days=buffer_days,
+    )
+    raw_active = any_filter.values.astype(bool)
+    stats_full = summarize_filter_fractions(df_mrf.index, raw_active, normal_ops)
+
+    training_stats = None
+    training_index = None
+    try:
+        from methods.load.observations import get_observational_training_data
+        from methods.config import PROCESSED_DATA_DIR
+
+        inflow_df, _, _ = get_observational_training_data(
+            reservoir_name="blueMarsh",
+            data_dir=PROCESSED_DATA_DIR,
+            as_numpy=False,
+            inflow_type="inflow_pub",
+        )
+        training_index = inflow_df.index
+        tr_raw = any_filter.reindex(training_index).fillna(False).astype(bool).values
+        tr_normal = build_normal_ops_filter(
+            training_index,
+            mrf_ranges_dict,
+            mode="ANY",
+            buffer_days=buffer_days,
+        )
+        training_stats = summarize_filter_fractions(training_index, tr_raw, tr_normal)
+    except Exception as exc:
+        print(f"  Note: could not compute Borg training overlap stats: {exc}")
+
     if args.csv_output:
         filter_df = pd.DataFrame(index=df_mrf.index)
         for key, ranges in mrf_ranges_dict.items():
@@ -244,47 +295,45 @@ def main() -> None:
                 active_filter.loc[r["start"] : r["end"]] = True
             filter_df[key] = active_filter.astype(int)
         filter_df["ANY_lower_basin"] = any_filter.astype(int)
+        filter_df["normal_ops_for_objectives"] = normal_ops.astype(int)
+        filter_df["excluded_from_objectives"] = (~normal_ops).astype(int)
         csv_output = Path(args.csv_output)
         csv_output.parent.mkdir(parents=True, exist_ok=True)
         filter_df.to_csv(csv_output)
         print(f"\n✓ Exported daily filter CSV to: {csv_output}")
 
+    summary_dir = Path(args.output_csv).parent
+    write_filter_summary_txt(
+        summary_dir / "mrf_filtering_summary.txt",
+        bundle_label=args.filter_bundle or "custom",
+        eps_mgd=args.epsilon,
+        buffer_days=buffer_days,
+        stats=stats_full,
+        training_index=training_index,
+        training_stats=training_stats,
+    )
+    print(open(summary_dir / "mrf_filtering_summary.txt").read())
+
     if args.plot_output:
-        print("\nGenerating diagnostic plot...")
-        df_plot = df_mrf.copy()
-        if args.plot_start or args.plot_end:
-            df_plot = df_plot.loc[slice(args.plot_start, args.plot_end)]
-            print(f"  Plotting date range: {df_plot.index.min()} to {df_plot.index.max()}")
-        else:
-            print(f"  Plotting full date range: {df_plot.index.min()} to {df_plot.index.max()}")
-
-        fig, ax = plt.subplots(figsize=(15, 6))
-        cols = [f"{prefix}{r}" for r in reservoirs if f"{prefix}{r}" in df_plot.columns]
-        label_map = {
-            "beltzvilleCombined": "Beltzville Combined",
-            "blueMarsh": "Blue Marsh",
-            "nockamixon": "Nockamixon",
-        }
-        labels = [label_map.get(r, r) for r in reservoirs if f"{prefix}{r}" in df_plot.columns]
-
-        if cols:
-            ax.stackplot(df_plot.index, *[df_plot[col] for col in cols], labels=labels, alpha=0.8)
-            ax.set_title(
-                "Lower Basin Reservoir Contributions to Trenton MRF\n"
-                f"({df_plot.index.min().strftime('%Y-%m-%d')} to {df_plot.index.max().strftime('%Y-%m-%d')})"
-            )
-            ax.set_ylabel("Contribution to MRF (MGD)")
-            ax.set_xlabel("Date")
-            ax.legend(loc="upper left")
-            ax.grid(alpha=0.3)
-            plt.tight_layout()
-            plot_path = Path(args.plot_output)
-            plot_path.parent.mkdir(parents=True, exist_ok=True)
-            fig.savefig(plot_path, dpi=300, bbox_inches="tight")
-            plt.close(fig)
-            print(f"✓ Exported diagnostic plot to: {plot_path}")
-        else:
-            print("  WARNING: No MRF contribution columns found for plotting")
+        bundle_title = (args.filter_bundle or args.flow_prediction_mode).replace("_", " ")
+        plot_mrf_contributions_active_periods(
+            df_mrf,
+            args.plot_output,
+            eps_mgd=args.epsilon,
+            title=f"{bundle_title}: lower-basin MRF (raw active > {args.epsilon} MGD)",
+        )
+        print(f"✓ Exported active-period plot: {args.plot_output}")
+        opt_plot = summary_dir / "mrf_filtering_for_optimization.png"
+        plot_mrf_filtering_for_optimization(
+            df_mrf,
+            raw_active,
+            normal_ops,
+            opt_plot,
+            buffer_days=buffer_days,
+            eps_mgd=args.epsilon,
+            title=f"{bundle_title}: MRF filtering for Borg objectives",
+        )
+        print(f"✓ Exported optimization filter plot: {opt_plot}")
 
     print("\n" + "=" * 60)
     print("DONE")

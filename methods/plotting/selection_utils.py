@@ -1,7 +1,7 @@
 """
-Advanced Pareto pick helpers used by the figure pipeline (``methods.postprocess.figures_primary`` / ``figures_validation``).
+Advanced Pareto pick helpers for ``figures_primary`` / ``figures_validation``.
 
-Delegates to :mod:`methods.plotting.selection_unified` (single source of truth).
+Active logic: :mod:`methods.plotting.selection_unified` only. See ``methods/plotting/SELECTION.md``.
 """
 
 from __future__ import annotations

@@ -1,4 +1,5 @@
 # methods/plotting/selection_unified.py
+"""Unified Pareto picks. Social-planner pick: ``NORMALIZED_EQUAL_WEIGHT_MEAN_OPTIMUM`` (label includes ``(social planner)``). See SELECTION.md."""
 from __future__ import annotations
 import re
 from typing import Dict, List, Mapping, Optional, Tuple
@@ -411,7 +412,7 @@ def build_unified_picks(obj_df: pd.DataFrame,
     """
     One-stop “wiring”:
       - Auto-detect present objectives
-      - Always add normalized equal-weight mean optimum (unified multi-objective average; sense-aware)
+      - Always add normalized equal-weight mean optimum (social planner); sense-aware equal-weight average
       - Add distance/knee/ε/diversity/HV picks when meaningful
       - Add per-objective optima
       - Deduplicate by solution index, preserving a sensible order

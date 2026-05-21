@@ -7,7 +7,9 @@ This folder is organized by **optimization filtering mode** so downstream script
 - `filtering/regression_disagg/`
   - `lower_basin_mrf_contributions.csv` — raw daily lower-basin MRF contributions extracted from Pywr output.
   - `mrf_active_filter_daily.csv` — binary daily filter (0/1) derived from contributions with `epsilon`.
-  - `mrf_contributions_regression_disagg.png` — diagnostic stacked-area plot of contributions.
+  - `lower_basin_mrf_contributions_active_periods.png` — contributions + raw active shading (> epsilon MGD).
+  - `mrf_filtering_for_optimization.png` — raw active vs buffer vs days included in Borg objectives.
+  - `mrf_filtering_summary.txt` — percent of days counted as normal operations (see `MRF_FILTERING_README.md`).
   - `traceability.txt` — inflow type, flow mode, and source HDF5 path used for extraction/build.
 
 - `filtering/perfect_foresight/`

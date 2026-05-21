@@ -12,7 +12,9 @@ STORAGE_NSE_OBJECTIVE_OPTIMUM = "Storage NSE objective optimum"
 AVERAGE_NSE_OBJECTIVE_OPTIMUM = "Average NSE objective optimum"
 BEST_AVERAGE_ALL = "Best Average All"
 
-NORMALIZED_EQUAL_WEIGHT_MEAN_OPTIMUM = "Normalized equal-weight mean optimum"
+NORMALIZED_EQUAL_WEIGHT_MEAN_OPTIMUM = (
+    "Normalized equal-weight mean optimum (social planner)"
+)
 
 MIN_EUCLIDEAN_L2_DISTANCE_TO_IP = "Minimum Euclidean (L2) distance to IP"
 MIN_WEIGHTED_CHEBYSHEV_DISTANCE_TO_IP = "Minimum weighted Chebyshev distance to IP"
@@ -77,6 +79,9 @@ def _build_legacy_to_canonical() -> Dict[str, str]:
         "Best Storage NSE": STORAGE_NSE_OBJECTIVE_OPTIMUM,
         "Best Average NSE": AVERAGE_NSE_OBJECTIVE_OPTIMUM,
         "Best Average (All Objectives)": NORMALIZED_EQUAL_WEIGHT_MEAN_OPTIMUM,
+        "Normalized equal-weight mean optimum": NORMALIZED_EQUAL_WEIGHT_MEAN_OPTIMUM,
+        "Social planner": NORMALIZED_EQUAL_WEIGHT_MEAN_OPTIMUM,
+        "Equal-weight mean (social planner)": NORMALIZED_EQUAL_WEIGHT_MEAN_OPTIMUM,
         "Best Average All": BEST_AVERAGE_ALL,
         "Compromise L2 (Euclidean)": MIN_EUCLIDEAN_L2_DISTANCE_TO_IP,
         "Tchebycheff L∞": MIN_WEIGHTED_CHEBYSHEV_DISTANCE_TO_IP,

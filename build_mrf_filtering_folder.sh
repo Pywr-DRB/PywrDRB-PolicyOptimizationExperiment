@@ -6,6 +6,11 @@
 # Each bundle contains:
 #   lower_basin_mrf_contributions.csv
 #   mrf_active_filter_daily.csv
+#   mrf_filtering_summary.txt (normal-ops %)
+#   lower_basin_mrf_contributions_active_periods.png
+#   mrf_filtering_for_optimization.png (buffer + objective exclusion)
+#
+# See MRF_FILTERING_README.md
 #
 # Usage (from CEE6400Project/, after module + venv — or this script loads them by default):
 #   bash build_mrf_filtering_folder.sh
@@ -135,28 +140,36 @@ if [[ -n "$_perf_hdf5" ]]; then
     --existing-output "$_perf_hdf5"
 else
   _perfect_inflow_for_sim="$PERFECT_INFLOW"
+  _can_sim_perfect=1
   if [[ ! -d "${PYWR_FLOW_ROOT}/${_perfect_inflow_for_sim}" ]]; then
     if [[ -d "${PYWR_FLOW_ROOT}/${REGRESSION_INFLOW}" ]]; then
-      echo "[build_mrf_filtering_folder] WARNING: flows/${_perfect_inflow_for_sim} not found; using REGRESSION_INFLOW=${REGRESSION_INFLOW} for local perfect_foresight fallback simulation."
+      echo "[build_mrf_filtering_folder] WARNING: flows/${_perfect_inflow_for_sim} not found; using REGRESSION_INFLOW=${REGRESSION_INFLOW} for perfect_foresight fallback simulation."
       _perfect_inflow_for_sim="$REGRESSION_INFLOW"
     else
-      echo "ERROR: flows/${_perfect_inflow_for_sim} not found and fallback flows/${REGRESSION_INFLOW} also missing." >&2
-      echo "  Set PERFECT_INFLOW= and/or PYWR_FLOW_ROOT= to a valid flow directory in your Pywr-DRB checkout." >&2
-      exit 1
+      _can_sim_perfect=0
     fi
   fi
-  if [[ "$_force_perfect" -eq 1 ]]; then
-    echo "[build_mrf_filtering_folder] perfect_foresight: FORCE_MRF_FILTER_BUILD=1 -> re-running Pywr simulation"
+  if [[ "$_can_sim_perfect" -eq 0 ]]; then
+    echo "[build_mrf_filtering_folder] WARNING: skipping perfect_foresight (no HDF5 and Pywr flow data missing)." >&2
+    echo "  Set PERFECT_HDF5= or install Pywr-DRB flows under PYWR_FLOW_ROOT=${PYWR_FLOW_ROOT}" >&2
+    echo "  regression_disagg bundle is enough for most Borg runs (CEE_MRF_FILTER_SOURCE=regression_disagg)." >&2
+    if [[ "${REQUIRE_PERFECT_MRF_PREBUILD:-0}" == "1" ]]; then
+      exit 1
+    fi
   else
-    echo "[build_mrf_filtering_folder] perfect_foresight: no existing HDF5 found; running Pywr simulation"
+    if [[ "$_force_perfect" -eq 1 ]]; then
+      echo "[build_mrf_filtering_folder] perfect_foresight: FORCE_MRF_FILTER_BUILD=1 -> re-running Pywr simulation"
+    else
+      echo "[build_mrf_filtering_folder] perfect_foresight: no existing HDF5 found; running Pywr simulation"
+    fi
+    python -m methods.preprocessing.build_mrf_active_filters \
+      --filter-bundle perfect_foresight \
+      --inflow-type "$_perfect_inflow_for_sim" \
+      --flow-prediction-mode perfect_foresight \
+      --start-date "$MRF_BUILD_START" \
+      --end-date "$MRF_BUILD_END" \
+      --work-dir "${ROOT}/preprocessing_outputs/pywr"
   fi
-  python -m methods.preprocessing.build_mrf_active_filters \
-    --filter-bundle perfect_foresight \
-    --inflow-type "$_perfect_inflow_for_sim" \
-    --flow-prediction-mode perfect_foresight \
-    --start-date "$MRF_BUILD_START" \
-    --end-date "$MRF_BUILD_END" \
-    --work-dir "${ROOT}/preprocessing_outputs/pywr"
 fi
 
 echo "[build_mrf_filtering_folder] done."
