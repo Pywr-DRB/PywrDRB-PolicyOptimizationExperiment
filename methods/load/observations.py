@@ -35,8 +35,18 @@ def load_observations(datatype,
 
     filepath = f"{data_dir}/{datatype}.csv"
 
-    df = pd.read_csv(filepath, index_col = 0, parse_dates=True)
-    df.index = pd.to_datetime(df.index.date)
+    df = pd.read_csv(filepath, index_col=0, parse_dates=True)
+    # Robust index normalization: parse to datetime even when pandas returns a
+    # generic Index (e.g., mixed/unclean CSV index values), then strip time.
+    idx = pd.to_datetime(df.index, errors="coerce")
+    if idx.isna().any():
+        n_bad = int(idx.isna().sum())
+        print(
+            f"Warning: dropping {n_bad} rows with non-datetime index values in {filepath}."
+        )
+        df = df.loc[~idx.isna()].copy()
+        idx = idx[~idx.isna()]
+    df.index = pd.DatetimeIndex(idx).normalize()
     
     
     # set 0.0 to NaN
