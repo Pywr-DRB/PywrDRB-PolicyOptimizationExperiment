@@ -130,7 +130,8 @@ class Reservoir():
             self.policy = RBF(policy_params=policy_params)
         elif policy_type == 'STARFIT':
             self.policy = STARFIT(policy_params=policy_params, reservoir_name=self.name)
-            self.policy.load_starfit_params(reservoir_name=self.name)
+            # Load only the fixed constants; keep the optimizer's 17 params (don't reload from CSV).
+            self.policy.load_starfit_constants(reservoir_name=self.name)
             assert self.policy.I_bar is not None, "STARFIT I_bar failed to load"
         else:
             raise ValueError(f"Invalid policy type: {policy_type}")
